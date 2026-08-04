@@ -10,12 +10,7 @@ const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBh
 // Cáº¤U HÃŒNH GEMINI API (Máº¢NG NHIá»€U KEY)
 // ==========================================
 const GEMINI_API_KEYS = [
-    'AQ.Ab8RN6Lky8JcDQASSlkXliyn' + 'mGKkqhBTsKRR3iL_u_wdeiOEtg', // Key 1
-    'AQ.Ab8RN6LykMm1uKl2POgB_GA_' + 'jdyDtaJOsGvAVn7R3p65cT-Xpw', // Key 2
-    'AQ.Ab8RN6IGQPejWWJmLIj2zP8O' + 'L5tTzjF5RBfQOaxQVrBo7YK4OQ', // Key 3
-    'AQ.Ab8RN6JFYwDzUMEgf3q-DLOC' + '9b-M0-WKK1hUchP7kdx8vZoR3w', // Key 4
-    'AQ.Ab8RN6I66qaTZ0mcjvBz5r8A' + 'M2k0GlcUFD101ShaOJqCg8kU8A', // Key 5
-    'AQ.Ab8RN6LG_ho68dywI6TurJ_n' + 'TSOnqleaMIa4S9Uy_MBz5lLuYA'  // Key 6
+    'AQ.Ab8RN6JXPmL3IC1SPgTub9d' + 'QQSlyRU82Vqwu_J3O7lhr2c8E9w' // Key 1 (Mới)
 ];
 let currentApiKeyIndex = 0;
 let supabaseClient = null;
