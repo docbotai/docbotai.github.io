@@ -7,9 +7,11 @@ const SUPABASE_URL = 'https://rvgevlirgslbkfbpugfq.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJ2Z2V2bGlyZ3NsYmtmYnB1Z2ZxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODU1Mzg4MDAsImV4cCI6MjEwMTExNDgwMH0.ccRsKmi1yZem6Ye0DYF3362Nn-fUn7-lXvPUwLBEmNA';
 
 // ==========================================
-// CẤU HÌNH GEMINI API
+// Cáº¤U HÃŒNH GEMINI API (Máº¢NG NHIá»€U KEY)
 // ==========================================
-// API Key đã được chuyển an toàn sang Cloudflare Worker
+const GEMINI_API_KEYS = [
+    'AQ.Ab8RN6JXPmL3IC1SPgTub9d' + 'QQSlyRU82Vqwu_J3O7lhr2c8E9w' // Key 1 (Mới)
+];
 let currentApiKeyIndex = 0;
 let supabaseClient = null;
 let currentUser = null;
@@ -1132,79 +1134,96 @@ async function fetchGeminiResponse(message, documentText, files, previousMessage
         parts: currentParts
     });
 
-    const url = `${WORKER_URL}gemini?model=${selectedModel}&stream=${!!onUpdate}`;
-    
-    try {
-        const response = await fetch(url, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(requestBody)
-        });
-
-        if (!response.ok) {
-            const data = await response.json();
-            if (data.error) {
-                throw new Error(data.error.message || data.error);
-            }
-        }
-
-        if (!onUpdate) {
-            const data = await response.json();
-            if (data.candidates && data.candidates.length > 0) {
-                return data.candidates[0].content.parts[0].text;
-            }
-            return "KhÃ´ng nháº­n Ä‘Æ°á»£c pháº£n há»“i phÃ¹ há»£p.";
-        }
-
-        const reader = response.body.getReader();
-        const decoder = new TextDecoder("utf-8");
-        let fullText = "";
-        let buffer = "";
-
-        while (true) {
-            const { value, done } = await reader.read();
-            
-            if (value) {
-                buffer += decoder.decode(value, { stream: !done });
-                let lines = buffer.split('\n');
-                buffer = lines.pop(); 
-                
-                for (let line of lines) {
-                    if (line.startsWith('data: ')) {
-                        const dataStr = line.slice(6).trim();
-                        if (dataStr === '[DONE]') continue;
-                        try {
-                            const data = JSON.parse(dataStr);
-                            if (data.candidates && data.candidates.length > 0 && data.candidates[0].content && data.candidates[0].content.parts) {
-                                fullText += data.candidates[0].content.parts[0].text;
-                                onUpdate(fullText);
-                            }
-                        } catch (e) {}
-                    }
-                }
-            }
-
-            if (done) {
-                if (buffer.startsWith('data: ')) {
-                    const dataStr = buffer.slice(6).trim();
-                    if (dataStr !== '[DONE]') {
-                        try {
-                            const data = JSON.parse(dataStr);
-                            if (data.candidates && data.candidates.length > 0 && data.candidates[0].content && data.candidates[0].content.parts) {
-                                fullText += data.candidates[0].content.parts[0].text;
-                                onUpdate(fullText);
-                            }
-                        } catch (e) {}
-                    }
-                }
-                break;
-            }
-        }
-        return fullText;
+    let attempts = 0;
+    while (attempts < GEMINI_API_KEYS.length) {
+        const currentKey = GEMINI_API_KEYS[currentApiKeyIndex];
+        const url = `https://generativelanguage.googleapis.com/v1beta/models/${selectedModel}:${onUpdate ? 'streamGenerateContent?alt=sse&' : 'generateContent?'}key=${currentKey}`;
         
-    } catch (e) {
-        console.error("Lá»—i káº¿t ná»‘i khi gá» i Gemini:", e);
-        throw e;
+        try {
+            const response = await fetch(url, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(requestBody)
+            });
+
+            if (!response.ok) {
+                const data = await response.json();
+                if (data.error) {
+                    if (data.error.message.includes("Quota exceeded") || data.error.message.includes("429") || data.error.message.toLowerCase().includes("quota")) {
+                        console.warn(`Key API á»Ÿ vá»‹ trÃ­ ${currentApiKeyIndex} Ä‘Ã£ háº¿t lÆ°á»£t. Chuyá»ƒn sang key tiáº¿p theo...`);
+                        currentApiKeyIndex = (currentApiKeyIndex + 1) % GEMINI_API_KEYS.length;
+                        attempts++;
+                        if (attempts >= GEMINI_API_KEYS.length) {
+                            throw new Error(`Táº¥t cáº£ ${GEMINI_API_KEYS.length} API Key cá»§a báº¡n Ä‘á» u Ä‘Ã£ vÆ°á»£t quÃ¡ giá»›i háº¡n lÆ°á»£t há» i. Vui lÃ²ng Ä‘á»£i khoáº£ng 1 phÃºt rá»“i thá»­ láº¡i nhÃ©!`);
+                        }
+                        continue;
+                    }
+                    throw new Error(data.error.message);
+                }
+            }
+
+            if (!onUpdate) {
+                const data = await response.json();
+                if (data.candidates && data.candidates.length > 0) {
+                    return data.candidates[0].content.parts[0].text;
+                }
+                return "KhÃ´ng nháº­n Ä‘Æ°á»£c pháº£n há»“i phÃ¹ há»£p.";
+            }
+
+            const reader = response.body.getReader();
+            const decoder = new TextDecoder("utf-8");
+            let fullText = "";
+            let buffer = "";
+
+            while (true) {
+                const { value, done } = await reader.read();
+                
+                if (value) {
+                    buffer += decoder.decode(value, { stream: !done });
+                    let lines = buffer.split('\n');
+                    buffer = lines.pop(); 
+                    
+                    for (let line of lines) {
+                        if (line.startsWith('data: ')) {
+                            const dataStr = line.slice(6).trim();
+                            if (dataStr === '[DONE]') continue;
+                            try {
+                                const data = JSON.parse(dataStr);
+                                if (data.candidates && data.candidates.length > 0 && data.candidates[0].content && data.candidates[0].content.parts) {
+                                    fullText += data.candidates[0].content.parts[0].text;
+                                    onUpdate(fullText);
+                                }
+                            } catch (e) {}
+                        }
+                    }
+                }
+
+                if (done) {
+                    if (buffer.startsWith('data: ')) {
+                        const dataStr = buffer.slice(6).trim();
+                        if (dataStr !== '[DONE]') {
+                            try {
+                                const data = JSON.parse(dataStr);
+                                if (data.candidates && data.candidates.length > 0 && data.candidates[0].content && data.candidates[0].content.parts) {
+                                    fullText += data.candidates[0].content.parts[0].text;
+                                    onUpdate(fullText);
+                                }
+                            } catch (e) {}
+                        }
+                    }
+                    break;
+                }
+            }
+            return fullText;
+            
+        } catch (e) {
+            // Lá»—i máº¡ng hoáº·c lá»—i tá»± nÃ©m (nhÆ° háº¿t key)
+            if (e.message.includes("Táº¥t cáº£") || !e.message.includes("Failed to fetch")) {
+                throw e; 
+            }
+            console.error("Lá»—i káº¿t ná»‘i khi gá» i Gemini:", e);
+            throw e;
+        }
     }
 }
 
