@@ -7,11 +7,9 @@ const SUPABASE_URL = 'https://rvgevlirgslbkfbpugfq.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJ2Z2V2bGlyZ3NsYmtmYnB1Z2ZxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODU1Mzg4MDAsImV4cCI6MjEwMTExNDgwMH0.ccRsKmi1yZem6Ye0DYF3362Nn-fUn7-lXvPUwLBEmNA';
 
 // ==========================================
-// Cáº¤U HÃŒNH GEMINI API (Máº¢NG NHIá»€U KEY)
+// CẤU HÌNH GEMINI API
 // ==========================================
-const GEMINI_API_KEYS = [
-    'AQ.Ab8RN6JXPmL3IC1SPgTub9d' + 'QQSlyRU82Vqwu_J3O7lhr2c8E9w' // Key 1 (Mới)
-];
+// API Key đã được chuyển an toàn sang Cloudflare Worker
 let currentApiKeyIndex = 0;
 let supabaseClient = null;
 let currentUser = null;
@@ -600,6 +598,27 @@ async function sendMessage() {
     }
     appendUserMessage(message, true, userImgBase64);
 
+    // Lấy lịch sử chat hiện tại để làm ngữ cảnh cho Gemini
+    let previousMessages = [];
+    try {
+        if (currentChatId) {
+            if (currentChatId.toString().startsWith('local_')) {
+                let localChats = JSON.parse(localStorage.getItem('localChats') || '[]');
+                let chat = localChats.find(c => c.id === currentChatId);
+                if (chat) previousMessages = chat.messages || [];
+            } else if (supabaseClient) {
+                const { data } = await supabaseClient
+                    .from('chats')
+                    .select('messages')
+                    .eq('id', currentChatId)
+                    .single();
+                if (data) previousMessages = data.messages || [];
+            }
+        }
+    } catch (e) {
+        console.error("Lỗi lấy lịch sử chat:", e);
+    }
+
     // 2. ThÃªm bong bÃ³ng "Ä‘ang gÃµ" cá»§a A.I
     const loadingId = "loading-" + Date.now();
     appendAILoading(loadingId);
@@ -699,7 +718,7 @@ async function sendMessage() {
             if (currentAttachedImageData) {
                 foundFiles.push(currentAttachedImageData);
             }
-            const aiText = await fetchGeminiResponse(message, workerText, foundFiles, (chunkText) => {
+            const aiText = await fetchGeminiResponse(message, workerText, foundFiles, previousMessages, (chunkText) => {
                 let tempHtml = workerHtml;
                 tempHtml += `<div class="markdown-body" style="margin-top: 15px;">${marked.parse(chunkText)}</div>`;
                 contentEl.innerHTML = tempHtml;
@@ -1002,6 +1021,12 @@ async function fetchDocumentSearch(message) {
                 
                 return false;
             });
+
+            // Nếu tìm thấy thư mục, chỉ trả về thư mục (bỏ qua các file lẻ để đỡ rối mắt)
+            const hasFolder = finalFiles.some(f => f.type === 'folder');
+            if (hasFolder) {
+                finalFiles = finalFiles.filter(f => f.type === 'folder');
+            }
             
             if (finalFiles.length === 0) {
                 const sampleFiles = files.slice(0, 5).map(f => f.name).join(", ");
@@ -1033,142 +1058,153 @@ async function fetchDocumentSearch(message) {
 }
 
 // Gá» i API cá»§a Google Gemini
-async function fetchGeminiResponse(message, documentText, files, onUpdate = null) {
-    if (!GEMINI_API_KEYS || GEMINI_API_KEYS.length === 0 || GEMINI_API_KEYS[0] === 'YOUR_GEMINI_API_KEY') {
-        throw new Error("Báº¡n chÆ°a cáº¥u hÃ¬nh `GEMINI_API_KEYS` trong file `app.js`.");
-    }
-
+async function fetchGeminiResponse(message, documentText, files, previousMessages, onUpdate = null) {
     const selectedModel = document.getElementById('modelSelect').value || "gemini-flash-latest";
 
-    let prompt = `Bạn là DocBot, một trợ lý AI chuyên hỗ trợ học tập và tìm kiếm tài liệu.\nNguyên tắc trả lời:\n1. Nếu người dùng chỉ nhập 1-2 từ (ví dụ: "Toán", "Vật lý") mà chưa rõ ý định, hãy trả lời thân thiện.\n2. Nếu yêu cầu tìm tài liệu, trả lời ngắn gọn.\n3. Nếu hỏi bài tập, hãy ĐỌC kĩ tài liệu đính kèm để giải đáp.\n4. TUYỆT ĐỐI KHÔNG bọc toàn bộ lời giải trong code block (không dùng \`\`\` hay \`\`\`markdown). Văn bản và công thức toán học ($ hoặc $$) phải để ở dạng text thường để hệ thống render.\n\nCâu hỏi của người dùng: "${message}"\n`;
-
-    const hasInlineData = files && files.some(f => f.inlineData);
-    if ((documentText && documentText.trim() !== "") || hasInlineData || (files && files.length > 0)) {
-        prompt += `\nDưới đây là danh sách các tài liệu/thư mục hệ thống vừa tìm được trong Google Drive:\n`;
-        if (files && files.length > 0) {
-            files.forEach(f => {
-                prompt += `- [${f.type === 'folder' ? 'Thư mục' : 'File'}] ${f.name}\n`;
-            });
-        }
-        if (documentText && documentText.trim() !== "") {
-            prompt += `\nNội dung chi tiết tài liệu:\n${documentText}\n`;
-        }
-        prompt += `\n(Hết phần thông tin. Hãy dựa vào nguyên tắc trên và các file/thư mục này để trả lời hoặc hướng dẫn người dùng).`;
-    }
-
-    const parts = [{ text: prompt }];
-
-    // NhÃºng PDF trá»±c tiáº¿p vÃ o cÃ¢u lá»‡nh cho Gemini
-    if (files) {
-        for (const f of files) {
-            if (f.inlineData) {
-                parts.push({
-                    inlineData: f.inlineData
-                });
-            }
-        }
-    }
+    const systemPrompt = `Bạn là DocBot, một trợ lý AI chuyên hỗ trợ học tập và tìm kiếm tài liệu.\nNguyên tắc trả lời:\n1. Nếu người dùng chỉ nhập 1-2 từ (ví dụ: "Toán", "Vật lý") mà chưa rõ ý định, hãy trả lời thân thiện.\n2. Nếu yêu cầu tìm tài liệu, trả lời ngắn gọn.\n3. Nếu hỏi bài tập, hãy ĐỌC kĩ tài liệu đính kèm để giải đáp.\n4. TUYỆT ĐỐI KHÔNG bọc toàn bộ lời giải trong code block (không dùng \`\`\` hay \`\`\`markdown). Văn bản và công thức toán học ($ hoặc $$) phải để ở dạng text thường để hệ thống render.`;
 
     const requestBody = {
-        contents: [{
-            parts: parts
-        }],
+        systemInstruction: {
+            parts: [{ text: systemPrompt }]
+        },
+        contents: [],
         generationConfig: {
             temperature: 0.7,
             maxOutputTokens: 8192,
         }
     };
 
-    let attempts = 0;
-    while (attempts < GEMINI_API_KEYS.length) {
-        const currentKey = GEMINI_API_KEYS[currentApiKeyIndex];
-        const url = `https://generativelanguage.googleapis.com/v1beta/models/${selectedModel}:${onUpdate ? 'streamGenerateContent?alt=sse&' : 'generateContent?'}key=${currentKey}`;
-        
-        try {
-            const response = await fetch(url, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(requestBody)
+    // Đưa lịch sử chat vào contents (để lấy ngữ cảnh)
+    if (previousMessages && previousMessages.length > 0) {
+        // Chỉ lấy tối đa 10 tin nhắn gần nhất để tránh quá tải token
+        const recentMessages = previousMessages.slice(-10);
+        for (const msg of recentMessages) {
+            let rawContent = msg.content;
+            if (msg.role === 'ai') {
+                // Xóa html phụ trợ để Gemini tập trung nội dung chính
+                rawContent = rawContent.replace(/<div class="status-box[^>]*>.*?<\/div>/gs, '');
+                rawContent = rawContent.replace(/<div class="worker-results[^>]*>.*?<\/div>/gs, '');
+                rawContent = rawContent.replace(/<[^>]*>?/gm, ''); 
+            }
+            const parts = [];
+            if (msg.image) {
+                const match = msg.image.match(/^data:(image\/[a-zA-Z]*);base64,(.*)$/);
+                if (match) {
+                    parts.push({ inlineData: { mimeType: match[1], data: match[2] } });
+                }
+            }
+            parts.push({ text: rawContent || " " });
+            requestBody.contents.push({
+                role: msg.role === 'user' ? 'user' : 'model',
+                parts: parts
             });
-
-            if (!response.ok) {
-                const data = await response.json();
-                if (data.error) {
-                    if (data.error.message.includes("Quota exceeded") || data.error.message.includes("429") || data.error.message.toLowerCase().includes("quota")) {
-                        console.warn(`Key API á»Ÿ vá»‹ trÃ­ ${currentApiKeyIndex} Ä‘Ã£ háº¿t lÆ°á»£t. Chuyá»ƒn sang key tiáº¿p theo...`);
-                        currentApiKeyIndex = (currentApiKeyIndex + 1) % GEMINI_API_KEYS.length;
-                        attempts++;
-                        if (attempts >= GEMINI_API_KEYS.length) {
-                            throw new Error(`Táº¥t cáº£ ${GEMINI_API_KEYS.length} API Key cá»§a báº¡n Ä‘á» u Ä‘Ã£ vÆ°á»£t quÃ¡ giá»›i háº¡n lÆ°á»£t há» i. Vui lÃ²ng Ä‘á»£i khoáº£ng 1 phÃºt rá»“i thá»­ láº¡i nhÃ©!`);
-                        }
-                        continue;
-                    }
-                    throw new Error(data.error.message);
-                }
-            }
-
-            if (!onUpdate) {
-                const data = await response.json();
-                if (data.candidates && data.candidates.length > 0) {
-                    return data.candidates[0].content.parts[0].text;
-                }
-                return "KhÃ´ng nháº­n Ä‘Æ°á»£c pháº£n há»“i phÃ¹ há»£p.";
-            }
-
-            const reader = response.body.getReader();
-            const decoder = new TextDecoder("utf-8");
-            let fullText = "";
-            let buffer = "";
-
-            while (true) {
-                const { value, done } = await reader.read();
-                
-                if (value) {
-                    buffer += decoder.decode(value, { stream: !done });
-                    let lines = buffer.split('\n');
-                    buffer = lines.pop(); 
-                    
-                    for (let line of lines) {
-                        if (line.startsWith('data: ')) {
-                            const dataStr = line.slice(6).trim();
-                            if (dataStr === '[DONE]') continue;
-                            try {
-                                const data = JSON.parse(dataStr);
-                                if (data.candidates && data.candidates.length > 0 && data.candidates[0].content && data.candidates[0].content.parts) {
-                                    fullText += data.candidates[0].content.parts[0].text;
-                                    onUpdate(fullText);
-                                }
-                            } catch (e) {}
-                        }
-                    }
-                }
-
-                if (done) {
-                    if (buffer.startsWith('data: ')) {
-                        const dataStr = buffer.slice(6).trim();
-                        if (dataStr !== '[DONE]') {
-                            try {
-                                const data = JSON.parse(dataStr);
-                                if (data.candidates && data.candidates.length > 0 && data.candidates[0].content && data.candidates[0].content.parts) {
-                                    fullText += data.candidates[0].content.parts[0].text;
-                                    onUpdate(fullText);
-                                }
-                            } catch (e) {}
-                        }
-                    }
-                    break;
-                }
-            }
-            return fullText;
-            
-        } catch (e) {
-            // Lá»—i máº¡ng hoáº·c lá»—i tá»± nÃ©m (nhÆ° háº¿t key)
-            if (e.message.includes("Táº¥t cáº£") || !e.message.includes("Failed to fetch")) {
-                throw e; 
-            }
-            console.error("Lá»—i káº¿t ná»‘i khi gá» i Gemini:", e);
-            throw e;
         }
+    }
+
+    let currentText = `Câu hỏi của người dùng: "${message}"\n`;
+
+    const hasInlineData = files && files.some(f => f.inlineData);
+    if ((documentText && documentText.trim() !== "") || hasInlineData || (files && files.length > 0)) {
+        currentText += `\nDưới đây là danh sách các tài liệu/thư mục hệ thống vừa tìm được trong Google Drive:\n`;
+        if (files && files.length > 0) {
+            files.forEach(f => {
+                currentText += `- [${f.type === 'folder' ? 'Thư mục' : 'File'}] ${f.name}\n`;
+            });
+        }
+        if (documentText && documentText.trim() !== "") {
+            currentText += `\nNội dung chi tiết tài liệu:\n${documentText}\n`;
+        }
+        currentText += `\n(Hết phần thông tin. Hãy dựa vào các file/thư mục này để trả lời hoặc hướng dẫn người dùng).`;
+    }
+
+    const currentParts = [{ text: currentText }];
+
+    if (files) {
+        for (const f of files) {
+            if (f.inlineData) {
+                currentParts.push({ inlineData: f.inlineData });
+            }
+        }
+    }
+
+    requestBody.contents.push({
+        role: 'user',
+        parts: currentParts
+    });
+
+    const url = `${WORKER_URL}gemini?model=${selectedModel}&stream=${!!onUpdate}`;
+    
+    try {
+        const response = await fetch(url, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(requestBody)
+        });
+
+        if (!response.ok) {
+            const data = await response.json();
+            if (data.error) {
+                throw new Error(data.error.message || data.error);
+            }
+        }
+
+        if (!onUpdate) {
+            const data = await response.json();
+            if (data.candidates && data.candidates.length > 0) {
+                return data.candidates[0].content.parts[0].text;
+            }
+            return "KhÃ´ng nháº­n Ä‘Æ°á»£c pháº£n há»“i phÃ¹ há»£p.";
+        }
+
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder("utf-8");
+        let fullText = "";
+        let buffer = "";
+
+        while (true) {
+            const { value, done } = await reader.read();
+            
+            if (value) {
+                buffer += decoder.decode(value, { stream: !done });
+                let lines = buffer.split('\n');
+                buffer = lines.pop(); 
+                
+                for (let line of lines) {
+                    if (line.startsWith('data: ')) {
+                        const dataStr = line.slice(6).trim();
+                        if (dataStr === '[DONE]') continue;
+                        try {
+                            const data = JSON.parse(dataStr);
+                            if (data.candidates && data.candidates.length > 0 && data.candidates[0].content && data.candidates[0].content.parts) {
+                                fullText += data.candidates[0].content.parts[0].text;
+                                onUpdate(fullText);
+                            }
+                        } catch (e) {}
+                    }
+                }
+            }
+
+            if (done) {
+                if (buffer.startsWith('data: ')) {
+                    const dataStr = buffer.slice(6).trim();
+                    if (dataStr !== '[DONE]') {
+                        try {
+                            const data = JSON.parse(dataStr);
+                            if (data.candidates && data.candidates.length > 0 && data.candidates[0].content && data.candidates[0].content.parts) {
+                                fullText += data.candidates[0].content.parts[0].text;
+                                onUpdate(fullText);
+                            }
+                        } catch (e) {}
+                    }
+                }
+                break;
+            }
+        }
+        return fullText;
+        
+    } catch (e) {
+        console.error("Lá»—i káº¿t ná»‘i khi gá» i Gemini:", e);
+        throw e;
     }
 }
 
