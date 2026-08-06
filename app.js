@@ -42,12 +42,7 @@ const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBh
 // Cáº¤U HÃŒNH GEMINI API (Máº¢NG NHIá»€U KEY)
 // ==========================================
 const GEMINI_API_KEYS = [
-    'AQ.Ab8RN6I4dSAZwmsC9Px1SBMHNrHHZiocCsoQ9z_uZYCoKIk5tQ',
-    'AQ.Ab8RN6Lz_abIHUMNdXjMoCwPKUli0yCWaK5HgGYWz_UOPmjG2w',
-    'AQ.Ab8RN6Jf5qWNUW0Htzfl8kpltmQomtL3axej4rBDNYAqfViQjg',
-    'AQ.Ab8RN6KOWij86HnV4uQwcqBJkywWL0QGcGk0QcqT-vDXXbJZVw',
-    'AQ.Ab8RN6J7b-bm0V8VXfuYukBf8C6PDu3TeJ7LTr6tNF4YnEhxnA',
-    'AQ.Ab8RN6KPC_1cMa2AfZYsniL8nRHhtoP3RaWZj0PR76XLnbl0KQ'
+    'AIzaSyBDRhMmDDOuI-ILHMXzEPMwqxCa5T7v_-c'
 ];
 let currentApiKeyIndex = 0;
 let supabaseClient = null;
@@ -151,11 +146,16 @@ window.addEventListener('load', async () => {
 });
 
 async function loadAvailableModels() {
-    if (!GEMINI_API_KEY || GEMINI_API_KEY === 'YOUR_GEMINI_API_KEY') return;
+    const apiKey = GEMINI_API_KEYS[0];
+    if (!apiKey) return;
 
     try {
-        const url = `https://generativelanguage.googleapis.com/v1beta/models?key=${GEMINI_API_KEY}`;
-        const response = await fetch(url);
+        const url = `https://generativelanguage.googleapis.com/v1beta/models?key=${apiKey}`;
+        const response = await fetch(url, {
+            headers: {
+                'Content-Type': 'application/json'
+            }
+        });
         const data = await response.json();
 
         if (data.models) {
@@ -1554,29 +1554,38 @@ async function fetchGeminiResponse(message, documentText, files, previousMessage
     let attempts = 0;
     while (attempts < GEMINI_API_KEYS.length) {
         const currentKey = GEMINI_API_KEYS[currentApiKeyIndex];
-        const url = `https://generativelanguage.googleapis.com/v1beta/models/${selectedModel}:${onUpdate ? 'streamGenerateContent?alt=sse&' : 'generateContent?'}key=${currentKey}`;
+        const endpoint = onUpdate ? 'streamGenerateContent?alt=sse&' : 'generateContent?';
+        const url = `https://generativelanguage.googleapis.com/v1beta/models/${selectedModel}:${endpoint}key=${currentKey}`;
         
         try {
             const response = await fetch(url, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: { 
+                    'Content-Type': 'application/json'
+                },
                 body: JSON.stringify(requestBody)
             });
 
             if (!response.ok) {
-                const data = await response.json();
-                if (data.error) {
-                    if (data.error.message.includes("Quota exceeded") || data.error.message.includes("429") || data.error.message.toLowerCase().includes("quota")) {
-                        console.warn(`Key API ở vị trí ${currentApiKeyIndex} đã hết lượt. Chuyển sang key tiếp theo...`);
-                        currentApiKeyIndex = (currentApiKeyIndex + 1) % GEMINI_API_KEYS.length;
-                        attempts++;
-                        if (attempts >= GEMINI_API_KEYS.length) {
-                            throw new Error(`Tất cả ${GEMINI_API_KEYS.length} API Key của bạn đều đã vượt quá giới hạn lượt hỏi. Vui lòng đợi khoảng 1 phút rồi thử lại nhé!`);
+                let errorMsg = `Lỗi kết nối API (HTTP ${response.status})`;
+                try {
+                    const data = await response.json();
+                    if (data.error && data.error.message) {
+                        errorMsg = data.error.message;
+                        if (errorMsg.includes("Quota exceeded") || errorMsg.includes("429") || errorMsg.toLowerCase().includes("quota")) {
+                            console.warn(`Key API ở vị trí ${currentApiKeyIndex} đã hết lượt. Chuyển sang key tiếp theo...`);
+                            currentApiKeyIndex = (currentApiKeyIndex + 1) % GEMINI_API_KEYS.length;
+                            attempts++;
+                            if (attempts >= GEMINI_API_KEYS.length) {
+                                throw new Error(`Tất cả ${GEMINI_API_KEYS.length} API Key của bạn đều đã vượt quá giới hạn lượt hỏi. Vui lòng đợi khoảng 1 phút rồi thử lại nhé!`);
+                            }
+                            continue;
                         }
-                        continue;
+                    } else if (data.error) {
+                        errorMsg = typeof data.error === 'string' ? data.error : JSON.stringify(data.error);
                     }
-                    throw new Error(data.error.message);
-                }
+                } catch(e) { }
+                throw new Error(errorMsg);
             }
 
             if (!onUpdate) {
@@ -1587,7 +1596,34 @@ async function fetchGeminiResponse(message, documentText, files, previousMessage
                 return "Không nhận được phản hồi phù hợp.";
             }
 
-            const reader = response.body.getReader();
+            let reader;
+            try {
+                reader = response.body.getReader();
+            } catch (readerError) {
+                console.warn("Lỗi getReader (có thể do tiện ích mở rộng/diệt virus khóa luồng):", readerError);
+                try {
+                    const fallbackText = await response.text();
+                    let parsedText = "";
+                    const lines = fallbackText.split('\n');
+                    for (let line of lines) {
+                        if (line.startsWith('data: ')) {
+                            const dataStr = line.slice(6).trim();
+                            if (dataStr === '[DONE]') continue;
+                            try {
+                                const data = JSON.parse(dataStr);
+                                if (data.candidates && data.candidates.length > 0 && data.candidates[0].content && data.candidates[0].content.parts) {
+                                    parsedText += data.candidates[0].content.parts[0].text;
+                                }
+                            } catch (e) {}
+                        }
+                    }
+                    if (onUpdate) onUpdate(parsedText);
+                    return parsedText;
+                } catch (fallbackError) {
+                    throw new Error("Trình duyệt không cho phép đọc luồng dữ liệu (Stream Locked). Vui lòng thử dùng Tab Ẩn danh (Incognito) hoặc tạm tắt các tiện ích chặn quảng cáo/diệt virus rồi thử lại.");
+                }
+            }
+
             const decoder = new TextDecoder("utf-8");
             let fullText = "";
             let buffer = "";
