@@ -39,12 +39,10 @@ const SUPABASE_URL = 'https://rvgevlirgslbkfbpugfq.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJ2Z2V2bGlyZ3NsYmtmYnB1Z2ZxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODU1Mzg4MDAsImV4cCI6MjEwMTExNDgwMH0.ccRsKmi1yZem6Ye0DYF3362Nn-fUn7-lXvPUwLBEmNA';
 
 // ==========================================
-// Cáº¤U HÃŒNH GEMINI API (Máº¢NG NHIá»€U KEY)
+// CẤU HÌNH GEMINI API
+// API Key đã được chuyển vào trong file worker-new.js để bảo mật
 // ==========================================
-const GEMINI_API_KEYS = [
-    'AIzaSyBDRhMmDDOuI-ILHMXzEPMwqxCa5T7v_-c'
-];
-let currentApiKeyIndex = 0;
+let currentApiKeyIndex = 0; // Giữ lại biến này để tránh lỗi cú pháp nếu đoạn code cũ còn gọi đến
 let supabaseClient = null;
 let currentUser = null;
 let currentChatId = null;
@@ -1552,10 +1550,11 @@ async function fetchGeminiResponse(message, documentText, files, previousMessage
     });
 
     let attempts = 0;
-    while (attempts < GEMINI_API_KEYS.length) {
-        const currentKey = GEMINI_API_KEYS[currentApiKeyIndex];
-        const endpoint = onUpdate ? 'streamGenerateContent?alt=sse&' : 'generateContent?';
-        const url = `https://generativelanguage.googleapis.com/v1beta/models/${selectedModel}:${endpoint}key=${currentKey}`;
+    while (attempts < 1) { // Chỉ gọi 1 lần vì key lưu ở worker, không còn mảng key
+        attempts++;
+        const endpoint = onUpdate ? 'streamGenerateContent?alt=sse' : 'generateContent';
+        const targetPath = `/v1beta/models/${selectedModel}:${endpoint}`;
+        const url = `${WORKER_URL}gemini-proxy?path=${encodeURIComponent(targetPath)}`;
         
         try {
             const response = await fetch(url, {
@@ -1573,13 +1572,7 @@ async function fetchGeminiResponse(message, documentText, files, previousMessage
                     if (data.error && data.error.message) {
                         errorMsg = data.error.message;
                         if (errorMsg.includes("Quota exceeded") || errorMsg.includes("429") || errorMsg.toLowerCase().includes("quota")) {
-                            console.warn(`Key API ở vị trí ${currentApiKeyIndex} đã hết lượt. Chuyển sang key tiếp theo...`);
-                            currentApiKeyIndex = (currentApiKeyIndex + 1) % GEMINI_API_KEYS.length;
-                            attempts++;
-                            if (attempts >= GEMINI_API_KEYS.length) {
-                                throw new Error(`Tất cả ${GEMINI_API_KEYS.length} API Key của bạn đều đã vượt quá giới hạn lượt hỏi. Vui lòng đợi khoảng 1 phút rồi thử lại nhé!`);
-                            }
-                            continue;
+                            throw new Error(`API Key trên máy chủ đã vượt quá giới hạn lượt hỏi. Vui lòng đợi khoảng 1 phút rồi thử lại nhé!`);
                         }
                     } else if (data.error) {
                         errorMsg = typeof data.error === 'string' ? data.error : JSON.stringify(data.error);
