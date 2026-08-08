@@ -144,11 +144,9 @@ window.addEventListener('load', async () => {
 });
 
 async function loadAvailableModels() {
-    const apiKey = GEMINI_API_KEYS[0];
-    if (!apiKey) return;
-
     try {
-        const url = `https://generativelanguage.googleapis.com/v1beta/models?key=${apiKey}`;
+        const targetPath = '/v1beta/models';
+        const url = `${WORKER_URL}gemini-proxy?path=${encodeURIComponent(targetPath)}`;
         const response = await fetch(url, {
             headers: {
                 'Content-Type': 'application/json'
