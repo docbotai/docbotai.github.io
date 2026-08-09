@@ -531,6 +531,7 @@ document.getElementById('newChatBtn').addEventListener('click', async () => {
 const chatContainer = document.getElementById("chatContainer");
 let welcomeScreen = document.getElementById("welcomeScreen"); // Chuyá»ƒn thÃ nh let Ä‘á»ƒ gÃ¡n láº¡i
 const messageInput = document.getElementById("message");
+let isSendingMessage = false;
 document.getElementById('searchBtn')?.addEventListener('click', sendMessage);
 
 // ThÃªm sá»± kiá»‡n nháº¥n phÃ­m Enter Ä‘á»ƒ gá»­i tin nháº¯n
@@ -670,6 +671,14 @@ if (removeImageBtn) {
 async function sendMessage() {
     const message = messageInput.value.trim();
     if (message === "" && !attachedImageData) return;
+    if (isSendingMessage) return;
+
+    isSendingMessage = true;
+    const sendButton = document.getElementById('searchBtn');
+    if (sendButton) {
+        sendButton.disabled = true;
+        sendButton.setAttribute('aria-busy', 'true');
+    }
 
     // Láº¥y áº£nh Ä‘Ã­nh kÃ¨m hiá»‡n táº¡i
     let currentAttachedImageData = null;
@@ -826,20 +835,26 @@ async function sendMessage() {
             </div>
         `;
         const contentEl = bubbleEl.querySelector('.bot-bubble');
+        const responseEl = document.createElement('div');
+        responseEl.className = 'markdown-body streaming-response';
+        responseEl.style.marginTop = '15px';
+        contentEl.appendChild(responseEl);
+        const streamRenderer = createStreamingRenderer(responseEl);
 
         try {
             if (currentAttachedImageData) {
                 foundFiles.push(currentAttachedImageData);
             }
             const aiText = await fetchGeminiResponse(message, workerText, foundFiles, previousMessages, (chunkText) => {
-                let tempHtml = workerHtml;
-                tempHtml += `<div class="markdown-body" style="margin-top: 15px;">${renderMarkdown(chunkText)}</div>`;
-                contentEl.innerHTML = tempHtml;
-                scrollToBottom();
+                streamRenderer.update(chunkText);
             });
-            finalHtml += `<div class="markdown-body" style="margin-top: 15px;">${renderMarkdown(aiText)}</div>`;
-            contentEl.innerHTML = finalHtml;
+            streamRenderer.cancel();
+            const renderedAiHtml = renderMarkdown(aiText);
+            responseEl.classList.remove('streaming-response');
+            responseEl.innerHTML = renderedAiHtml;
+            finalHtml += `<div class="markdown-body" style="margin-top: 15px;">${renderedAiHtml}</div>`;
         } catch (e) {
+            streamRenderer.cancel();
             console.error("Lỗi Gemini:", e);
             finalHtml += `<div class="status-box status-warning" style="margin-top: 15px;">
                 <strong>⚠️ Lỗi Gemini:</strong><br>
@@ -860,6 +875,13 @@ async function sendMessage() {
         removeElement(loadingId);
         appendAIMessage(`<div class="status-box status-error"><strong>❌ Lỗi kết nối:</strong> Không thể kết nối tới server.<br>${escapeHTML(error.message)}</div>`);
         scrollToBottom();
+    } finally {
+        isSendingMessage = false;
+        const sendButton = document.getElementById('searchBtn');
+        if (sendButton) {
+            sendButton.disabled = false;
+            sendButton.removeAttribute('aria-busy');
+        }
     }
 }
 
@@ -1212,9 +1234,76 @@ function removeElement(id) {
     if (el) el.remove();
 }
 
-function scrollToBottom() {
-    const wrapper = document.getElementById('chatWrapper');
-    wrapper.scrollTop = wrapper.scrollHeight;
+let scrollFrameId = null;
+let forceScrollPending = false;
+
+function scrollToBottom(force = true) {
+    if (force) forceScrollPending = true;
+    if (scrollFrameId !== null) return;
+
+    scrollFrameId = requestAnimationFrame(() => {
+        const wrapper = document.getElementById('chatWrapper');
+        scrollFrameId = null;
+        if (!wrapper) {
+            forceScrollPending = false;
+            return;
+        }
+
+        const distanceFromBottom = wrapper.scrollHeight - wrapper.scrollTop - wrapper.clientHeight;
+        const shouldScroll = forceScrollPending || distanceFromBottom < 240;
+        forceScrollPending = false;
+        if (shouldScroll) wrapper.scrollTop = wrapper.scrollHeight;
+    });
+}
+
+function createStreamingRenderer(element) {
+    const isMobile = window.matchMedia('(max-width: 768px)').matches;
+    const hasFewCores = Number(navigator.hardwareConcurrency || 8) <= 4;
+    const updateInterval = isMobile || hasFewCores ? 180 : 90;
+    const textNode = document.createTextNode('');
+    element.appendChild(textNode);
+    let latestText = '';
+    let paintedText = '';
+    let lastPaint = 0;
+    let timeoutId = null;
+    let frameId = null;
+    let cancelled = false;
+
+    const paint = () => {
+        frameId = null;
+        if (cancelled) return;
+        if (latestText.startsWith(paintedText)) {
+            textNode.appendData(latestText.slice(paintedText.length));
+        } else {
+            textNode.data = latestText;
+        }
+        paintedText = latestText;
+        lastPaint = performance.now();
+        scrollToBottom(false);
+    };
+
+    const schedulePaint = () => {
+        if (cancelled || timeoutId !== null || frameId !== null) return;
+        const delay = Math.max(0, updateInterval - (performance.now() - lastPaint));
+        timeoutId = setTimeout(() => {
+            timeoutId = null;
+            frameId = requestAnimationFrame(paint);
+        }, delay);
+    };
+
+    return {
+        update(text) {
+            latestText = String(text ?? '');
+            schedulePaint();
+        },
+        cancel() {
+            cancelled = true;
+            if (timeoutId !== null) clearTimeout(timeoutId);
+            if (frameId !== null) cancelAnimationFrame(frameId);
+            timeoutId = null;
+            frameId = null;
+        }
+    };
 }
 
 // HÃ m chá»‘ng XSS khi render text cá»§a ngÆ°á» i dÃ¹ng
@@ -1557,6 +1646,7 @@ async function fetchGeminiResponse(message, documentText, files, previousMessage
             let fullText = "";
             let buffer = "";
             let lastUpdate = 0;
+            const streamUpdateInterval = window.matchMedia('(max-width: 768px)').matches ? 180 : 100;
 
             while (true) {
                 const { value, done } = await reader.read();
@@ -1575,7 +1665,7 @@ async function fetchGeminiResponse(message, documentText, files, previousMessage
                                 if (data.candidates && data.candidates.length > 0 && data.candidates[0].content && data.candidates[0].content.parts) {
                                     fullText += data.candidates[0].content.parts[0].text;
                                     const now = Date.now();
-                                    if (now - lastUpdate > 50) {
+                                    if (now - lastUpdate >= streamUpdateInterval) {
                                         onUpdate(fullText);
                                         lastUpdate = now;
                                     }
