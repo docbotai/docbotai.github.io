@@ -150,7 +150,7 @@
                 <button class="icon-btn mobile-menu-btn" id="mobileMenuBtn">
                     <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="18" x2="21" y2="18"></line></svg>
                 </button>
-                <div class="logo-area" onclick="location.reload();" style="cursor: pointer;" title="Tải lại trang">
+                <div class="logo-area" id="logoArea" style="cursor: pointer;" title="Tải lại trang">
                     <img src="logo.png" alt="DocBot Logo" style="height: 32px; margin-right: 4px;">
                     <span class="logo-text">DocBot</span>
                 </div>
@@ -203,7 +203,7 @@
                         </div>
                         <input type="file" id="imageUploadInput" accept="image/*" style="display: none;">
                         <input type="text" id="message" placeholder="Hỏi DocBot hoặc tìm kiếm tài liệu..." autocomplete="off">
-                        <button class="icon-btn send-btn" onclick="sendMessage()" id="searchBtn">
+                        <button class="icon-btn send-btn" id="searchBtn">
                             <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 2L11 13"></path><path d="M22 2L15 22L11 13L2 9L22 2z"></path></svg>
                         </button>
                     </div>
@@ -313,8 +313,9 @@
     <!-- Scripts -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/dompurify@3.2.6/dist/purify.min.js"></script>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.css">
     <script src="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.js"></script>
-    <script src="app.js?v=34"></script>
+    <script src="app.js?v=35"></script>
 </body>
 </html>
