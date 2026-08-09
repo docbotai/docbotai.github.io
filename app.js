@@ -1,5 +1,4 @@
-const WORKER_URL = "https://tailieu-ai.mnhmanh0910.workers.dev/";
-
+const WORKER_URL = "https://tailieu-ai.mnhmanh0910.workers.dev/".replace(/\/+$/, "") + "/";
 // --- MOBILE CONTEXT MENU ---
 const mobileMenuContainer = document.createElement('div');
 mobileMenuContainer.id = 'mobileMessageMenu';
@@ -109,6 +108,7 @@ const handleGoogleLogin = async () => {
 // Xá»­ lÃ½ nÃºt Ä Äƒng nháº­p Google
 document.getElementById('googleLoginBtn')?.addEventListener('click', handleGoogleLogin);
 document.getElementById('sidebarLoginBtn')?.addEventListener('click', handleGoogleLogin);
+document.getElementById('logoArea')?.addEventListener('click', () => location.reload());
 
 // Kiá»ƒm tra phiÃªn Ä‘Äƒng nháº­p khi táº£i trang
 window.addEventListener('load', async () => {
@@ -176,7 +176,7 @@ async function loadAvailableModels() {
             } else if (Array.from(select.options).some(opt => opt.value === 'gemini-3.1-flash-lite')) {
                 select.value = 'gemini-3.1-flash-lite';
             }
-            
+
             console.log("ÄÃ£ táº£i danh sÃ¡ch Model thÃ nh cÃ´ng!");
         } else if (data.error) {
             console.error("Lá»—i API Key khi láº¥y danh sÃ¡ch model:", data.error.message);
@@ -192,40 +192,41 @@ function handleUserLogin(user) {
     // áº¨n nÃºt Ä‘Äƒng nháº­p, hiá»‡n avatar
     const googleLoginBtn = document.getElementById('googleLoginBtn');
     if (googleLoginBtn) googleLoginBtn.style.display = 'none';
-    
+
     const sidebarLoginBtn = document.getElementById('sidebarLoginBtn');
     if (sidebarLoginBtn) sidebarLoginBtn.style.display = 'none';
 
     // Avatar gÃ³c trÃªn
     const topAvatar = document.getElementById('topAvatar');
+    const avatarUrl = safeImageUrl(user.user_metadata?.avatar_url);
     if (topAvatar) {
         topAvatar.style.display = 'block';
-        topAvatar.innerHTML = `<img src="${user.user_metadata.avatar_url}" alt="Avatar" style="width: 100%; border-radius: 50%;">`;
+        topAvatar.innerHTML = avatarUrl ? `<img src="${escapeHTML(avatarUrl)}" alt="Avatar" style="width: 100%; border-radius: 50%;">` : '';
     }
 
     // Profile gÃ³c dÆ°á»›i
     const userProfile = document.getElementById('userProfile');
     if (userProfile) {
         userProfile.style.display = 'flex';
-        document.getElementById('userAvatar').innerHTML = `<img src="${user.user_metadata.avatar_url}" style="width: 100%; border-radius: 50%;">`;
-        document.getElementById('userName').textContent = user.user_metadata.full_name;
+        document.getElementById('userAvatar').innerHTML = avatarUrl ? `<img src="${escapeHTML(avatarUrl)}" alt="Avatar" style="width: 100%; border-radius: 50%;">` : '';
+        document.getElementById('userName').textContent = user.user_metadata?.full_name || user.email || 'Người dùng';
     }
-    
+
     // Cáº­p nháº­t thÃ´ng tin trong Account Modal
     const modalEmail = document.getElementById('modalEmail');
     const modalGreeting = document.getElementById('modalGreeting');
     const accountModalAvatar = document.getElementById('accountModalAvatar');
-    
+
     if (modalEmail) modalEmail.textContent = user.email;
     if (modalGreeting) {
-        const nameParts = user.user_metadata.full_name.split(' ');
+        const nameParts = (user.user_metadata?.full_name || user.email || 'bạn').split(' ');
         const firstName = nameParts[nameParts.length - 1];
         modalGreeting.textContent = `Chào ${firstName},`;
     }
     if (accountModalAvatar) {
-        accountModalAvatar.innerHTML = `<img src="${user.user_metadata.avatar_url}" style="width: 100%; border-radius: 50%;">`;
+        accountModalAvatar.innerHTML = avatarUrl ? `<img src="${escapeHTML(avatarUrl)}" alt="Avatar" style="width: 100%; border-radius: 50%;">` : '';
     }
-    
+
     // Render các tài khoản phụ
     renderMockAccounts(user.email);
 
@@ -243,11 +244,11 @@ function renderMockAccounts(currentEmail) {
 
     const container = document.getElementById('mockAccountsContainer');
     if (!container) return;
-    
+
     container.innerHTML = '';
-    
+
     const current = (currentEmail || '').toLowerCase().trim();
-    
+
     allAccounts.forEach(acc => {
         if (acc.email.toLowerCase().trim() !== current) {
             const div = document.createElement('div');
@@ -260,7 +261,7 @@ function renderMockAccounts(currentEmail) {
                 </div>
                 <div class="account-status">Đã đăng xuất</div>
             `;
-            
+
             // ThÃªm sá»± kiá»‡n click
             div.addEventListener('click', async (e) => {
                 e.stopPropagation();
@@ -275,7 +276,7 @@ function renderMockAccounts(currentEmail) {
                     });
                 }
             });
-            
+
             container.appendChild(div);
         }
     });
@@ -297,9 +298,9 @@ function handleUserLogout() {
     if (sidebarLoginBtn) sidebarLoginBtn.style.display = 'flex';
     document.getElementById('topAvatar').style.display = 'none';
     document.getElementById('userProfile').style.display = 'none';
-    
+
     loadChatHistory(null);
-    
+
     // ÄÃ³ng cÃ¡c báº£ng cÃ i Ä‘áº·t vÃ  tÃ i khoáº£n náº¿u Ä‘ang má»Ÿ
     const accountModal = document.getElementById('accountModal');
     if (accountModal) accountModal.classList.remove('active');
@@ -344,7 +345,7 @@ async function loadChatHistory(userId) {
         const pinnedList = document.querySelector('.pinned-list');
         const pinnedSection = document.getElementById('pinnedSection');
         if (pinnedList) pinnedList.innerHTML = '';
-        
+
         let pinnedChatsKey = userId ? 'pinnedChats_' + userId : 'pinnedChats_local';
         let pinnedChats = JSON.parse(localStorage.getItem(pinnedChatsKey) || "[]");
         let hasPinned = false;
@@ -354,8 +355,8 @@ async function loadChatHistory(userId) {
             const div = document.createElement('div');
             div.className = 'recent-item';
             if (chat.id === currentChatId) div.classList.add('active');
-            
-            const iconSvg = isPinned 
+
+            const iconSvg = isPinned
                 ? `<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="2" style="transform: rotate(45deg);"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"></path></svg>`
                 : `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>`;
 
@@ -368,7 +369,7 @@ async function loadChatHistory(userId) {
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="1.5"></circle><circle cx="12" cy="5" r="1.5"></circle><circle cx="12" cy="19" r="1.5"></circle></svg>
                 </div>
             `;
-            
+
             const titleGroup = div.querySelector('.chat-title-group');
             if (titleGroup) {
                 titleGroup.onclick = (e) => {
@@ -376,7 +377,7 @@ async function loadChatHistory(userId) {
                     openChat(chat.id);
                 };
             }
-            
+
             const optionsBtn = div.querySelector('.chat-options-btn');
             if (optionsBtn) {
                 optionsBtn.onclick = (e) => {
@@ -384,7 +385,7 @@ async function loadChatHistory(userId) {
                     openChatMenu(e, chat.id, chat.title, optionsBtn);
                 };
             }
-            
+
             if (isPinned && pinnedList) {
                 pinnedList.appendChild(div);
                 hasPinned = true;
@@ -392,7 +393,7 @@ async function loadChatHistory(userId) {
                 recentList.appendChild(div);
             }
         });
-        
+
         if (pinnedSection) {
             pinnedSection.style.display = hasPinned ? 'block' : 'none';
         }
@@ -452,9 +453,9 @@ async function openChat(chatId) {
             appendAIMessage(msg.content, false);
         }
     });
-    
+
     scrollToBottom();
-    
+
     // Fade in
     setTimeout(() => {
         chatWrapper.style.transition = 'opacity 0.3s ease';
@@ -486,7 +487,7 @@ document.getElementById('newChatBtn').addEventListener('click', async () => {
             }])
             .select('id')
             .single();
-            
+
         if (!error && data) {
             currentChatId = data.id;
         } else {
@@ -516,7 +517,7 @@ document.getElementById('newChatBtn').addEventListener('click', async () => {
     } else {
         loadChatHistory(null);
     }
-    
+
     setTimeout(() => {
         chatWrapper.style.transition = 'opacity 0.3s ease';
         chatWrapper.style.opacity = '1';
@@ -530,6 +531,7 @@ document.getElementById('newChatBtn').addEventListener('click', async () => {
 const chatContainer = document.getElementById("chatContainer");
 let welcomeScreen = document.getElementById("welcomeScreen"); // Chuyá»ƒn thÃ nh let Ä‘á»ƒ gÃ¡n láº¡i
 const messageInput = document.getElementById("message");
+document.getElementById('searchBtn')?.addEventListener('click', sendMessage);
 
 // ThÃªm sá»± kiá»‡n nháº¥n phÃ­m Enter Ä‘á»ƒ gá»­i tin nháº¯n
 messageInput.addEventListener("keypress", function (e) {
@@ -542,8 +544,6 @@ messageInput.addEventListener("keypress", function (e) {
 // Xá»¬ LÃ  MENU Ä Ã NH KÃˆM
 // ==========================================
 let attachedImageData = null;
-let isImageGenerationMode = false;
-
 const attachmentBtn = document.getElementById('attachmentBtn');
 const attachmentMenu = document.getElementById('attachmentMenu');
 const webSearchToggle = document.getElementById('webSearchToggle');
@@ -610,13 +610,13 @@ if (optUploadImage && imageUploadInput) {
     async function handleImageFile(file) {
         try {
             // Hiển thị tạm ảnh để người dùng biết đang tải
-            imagePreview.src = "https://i.gifer.com/ZKZg.gif"; 
+            imagePreview.src = "https://i.gifer.com/ZKZg.gif";
             imagePreviewContainer.style.display = 'inline-block';
-            
+
             // Nén ảnh xuống tối đa 1024x1024, chất lượng 70%
             const compressedDataUrl = await compressImage(file, 1024, 1024, 0.7);
             const base64Data = compressedDataUrl.split(',')[1];
-            
+
             attachedImageData = {
                 inlineData: {
                     mimeType: 'image/jpeg', // Canvas toDataURL trả về jpeg
@@ -674,9 +674,9 @@ async function sendMessage() {
     // Láº¥y áº£nh Ä‘Ã­nh kÃ¨m hiá»‡n táº¡i
     let currentAttachedImageData = null;
     if (attachedImageData) {
-        currentAttachedImageData = {...attachedImageData};
+        currentAttachedImageData = { ...attachedImageData };
     }
-    
+
     // Reset tÃ­nh nÄƒng sau khi báº¥m gá»­i
     if (attachedImageData) {
         attachedImageData = null;
@@ -699,105 +699,9 @@ async function sendMessage() {
     if (currentAttachedImageData && currentAttachedImageData.inlineData) {
         userImgBase64 = `data:${currentAttachedImageData.inlineData.mimeType};base64,${currentAttachedImageData.inlineData.data}`;
     }
-    
-    // Tự động nhận diện ý định tạo ảnh qua câu lệnh (không cần bấm nút)
-    const imageIntentRegex = /^(tạo ảnh|vẽ ảnh|vẽ hình|vẽ con|tạo hình|tạo bức ảnh|vẽ bức ảnh|tạo ra ảnh|vẽ ra ảnh|tạo ra con|vẽ ra con|tạo con|vẽ một|tạo một bức|vẽ một bức|generate image|draw a|create an image)/i;
-    const isAutoImageMode = imageIntentRegex.test(message);
-    
-    // Nếu đang ở chế độ tạo ảnh AI (hoặc tự động nhận diện)
-    if (isImageGenerationMode || isAutoImageMode) {
-        isImageGenerationMode = false;
-        messageInput.placeholder = "Hỏi DocBot hoặc tìm kiếm tài liệu...";
-        
-        // Nếu tự gõ thì không cần thêm chữ "Tạo ảnh với mô tả", chỉ hiển thị nguyên văn
-        const displayMsg = isAutoImageMode && !isImageGenerationMode ? message : `Tạo ảnh với mô tả: "${message}"`;
-        appendUserMessage(displayMsg, true, userImgBase64);
-        const loadingId = "loading-" + Date.now();
-        
-        // Custom loading cho tạo ảnh
-        const loadingDiv = document.createElement('div');
-        loadingDiv.className = 'chat-bubble ai-bubble';
-        loadingDiv.id = loadingId;
-        loadingDiv.innerHTML = `
-            <div class="ai-avatar">✨</div>
-            <div class="bubble-content">
-                <div class="status-box status-success">Docbot đang vẽ ảnh (có thể mất 10-20 giây)...</div>
-            </div>
-        `;
-        document.getElementById("chatContainer").appendChild(loadingDiv);
-        scrollToBottom();
-        
-        try {
-            // Dịch prompt tiếng Việt sang tiếng Anh
-            let englishPrompt = message;
-            try {
-                const transRes = await fetch(`https://translate.googleapis.com/translate_a/single?client=gtx&sl=vi&tl=en&dt=t&q=${encodeURIComponent(message)}`);
-                const transData = await transRes.json();
-                if (transData && transData[0] && transData[0][0] && transData[0][0][0]) {
-                    englishPrompt = transData[0][0][0];
-                }
-            } catch (e) {
-                console.warn("Lỗi dịch prompt:", e);
-            }
-            
-            const hfToken = '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';
-            // Gọi qua Cloudflare Worker để lách luật chặn DNS của nhà mạng VN
-            const hfUrl = 'https://tailieu-ai.mnhmanh0910.workers.dev/hf-proxy';
-            
-            let imageUrl = '';
-            try {
-                const response = await fetch(hfUrl, {
-                    method: 'POST',
-                    headers: {
-                        'Authorization': `Bearer ${hfToken}`,
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({ inputs: englishPrompt })
-                });
 
-                if (!response.ok) {
-                    throw new Error("Server tạo ảnh đang quá tải hoặc lỗi mạng. Vui lòng thử lại sau.");
-                }
 
-                const blob = await response.blob();
-                imageUrl = await new Promise((resolve, reject) => {
-                    const reader = new FileReader();
-                    reader.onloadend = () => resolve(reader.result);
-                    reader.onerror = reject;
-                    reader.readAsDataURL(blob);
-                });
-            } catch (apiError) {
-                throw new Error(apiError.message || "Lỗi kết nối.");
-            }
-            
-            const finalHtml = `
-                <div style="margin-top: 10px;">
-                    <p>Đây là ảnh tạo theo yêu cầu của bạn (Bởi <b>FLUX.1</b> - Không lo bị chặn nữa 🎉):</p>
-                    <img src="${imageUrl}" style="max-width: 100%; border-radius: 8px; margin-top: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);" alt="AI Generated Image" onload="scrollToBottom()">
-                </div>
-            `;
-            
-            const bubbleEl = document.getElementById(loadingId);
-            bubbleEl.innerHTML = `
-                <div class="chat-avatar bot-avatar">✨</div>
-                <div class="chat-bubble bot-bubble" style="background: transparent; border: none; box-shadow: none; padding: 0;">
-                    ${finalHtml}
-                </div>
-            `;
-            
-            await saveChatToDB(`Tạo ảnh với mô tả: "${message}"`, finalHtml, userImgBase64);
-        } catch (e) {
-            console.error("Lỗi tạo ảnh:", e);
-            document.getElementById(loadingId).innerHTML = `
-                <div class="chat-avatar bot-avatar">✨</div>
-                <div class="chat-bubble bot-bubble">
-                    <div class="status-box status-warning">Lỗi tạo ảnh: ${escapeHTML(e.message)}</div>
-                </div>
-            `;
-        }
-        return;
-    }
-    
+
     appendUserMessage(message, true, userImgBase64);
 
     // Lấy lịch sử chat hiện tại để làm ngữ cảnh cho Gemini
@@ -838,7 +742,7 @@ async function sendMessage() {
             const workerData = await fetchDocumentSearch(message);
             if (workerData.success && workerData.files && workerData.files.length > 0) {
                 foundFiles = workerData.files;
-                
+
                 // Hiển thị danh sách file tìm được
                 workerHtml += `<div class="worker-results" style="margin-bottom: 10px;">
                     <div style="font-weight: 500; color: #1a73e8; margin-bottom: 8px; font-size: 0.9em; display: flex; align-items: center; gap: 4px;">
@@ -847,7 +751,7 @@ async function sendMessage() {
                     </div>`;
                 foundFiles.forEach(f => {
                     const icon = f.type === 'folder' ? '📁' : '📄';
-                    workerHtml += `<a href="${f.link}" target="_blank" class="file-link">
+                    workerHtml += `<a href="${escapeHTML(safeHref(f.link))}" target="_blank" rel="noopener noreferrer" class="file-link">
                         <span class="file-icon">${icon}</span>
                         <span class="file-name">${escapeHTML(f.name)}</span>
                     </a>`;
@@ -870,7 +774,7 @@ async function sendMessage() {
                         const res = await fetch(`${WORKER_URL}download?id=${f.id}&mimeType=${encodeURIComponent(f.mimeType)}`);
                         if (res.ok) {
                             const binaryMimes = [
-                                "application/pdf", 
+                                "application/pdf",
                                 "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
                                 "application/msword",
                                 "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
@@ -899,7 +803,7 @@ async function sendMessage() {
                 // Kiá»ƒm tra xem Ä‘Ã¢y cÃ³ pháº£i lÃ  cÃ¢u há» i giao tiáº¿p thÃ´ng thÆ°á» ng hay khÃ´ng
                 const isSearchIntent = /tÃ¬m|tÃ i liá»‡u|Ä‘á»  thi|chuyÃªn Ä‘á» |bÃ i táº­p|file|folder|thÆ° má»¥c|tÃ³m táº¯t|sÃ¡ch|Ä‘Ã¡p Ã¡n|tìm|tài liệu|đề thi|chuyên đề|bài tập|thư mục|tóm tắt|sách|đáp án/i.test(message);
                 const isConversational = /báº¡n|chÃ o|cáº£m Æ¡n|Æ¡i|Ã |nhÃ©|nha|nhá»‰|khÃ´ng\s*\?|lÃ \s+gÃ¬|ai|bạn|chào|cảm ơn|ơi|à|nhé|nha|nhỉ|không|là gì/i.test(message);
-                
+
                 // Chỉ hiện lỗi tìm kiếm nếu người dùng CÓ ý định tìm kiếm, 
                 // HOẶC nếu câu đó KHÔNG PHẢI là câu giao tiếp (như gõ tên file cụ thể)
                 if (isSearchIntent || (!isConversational && message.length >= 5)) {
@@ -909,7 +813,7 @@ async function sendMessage() {
             }
         } catch (e) {
             console.error("Lỗi fetchDocumentSearch:", e);
-            workerHtml += `<div class="status-box status-warning">Không thể kết nối tới kho tài liệu. Lỗi: ${e.message}</div>`;
+            workerHtml += `<div class="status-box status-warning">Không thể kết nối tới kho tài liệu. Lỗi: ${escapeHTML(e.message)}</div>`;
         }
 
         // 2. Gá»ŒI GEMINI Vá»šI KIáº¾N THá»¨C Tá»ª TÃ€I LIá»†U
@@ -929,11 +833,11 @@ async function sendMessage() {
             }
             const aiText = await fetchGeminiResponse(message, workerText, foundFiles, previousMessages, (chunkText) => {
                 let tempHtml = workerHtml;
-                tempHtml += `<div class="markdown-body" style="margin-top: 15px;">${marked.parse(chunkText)}</div>`;
+                tempHtml += `<div class="markdown-body" style="margin-top: 15px;">${renderMarkdown(chunkText)}</div>`;
                 contentEl.innerHTML = tempHtml;
                 scrollToBottom();
             });
-            finalHtml += `<div class="markdown-body" style="margin-top: 15px;">${marked.parse(aiText)}</div>`;
+            finalHtml += `<div class="markdown-body" style="margin-top: 15px;">${renderMarkdown(aiText)}</div>`;
             contentEl.innerHTML = finalHtml;
         } catch (e) {
             console.error("Lỗi Gemini:", e);
@@ -954,7 +858,7 @@ async function sendMessage() {
     } catch (error) {
         console.error(error);
         removeElement(loadingId);
-        appendAIMessage(`<div class="status-box status-error"><strong>❌ Lỗi kết nối:</strong> Không thể kết nối tới server.<br>${error.message}</div>`);
+        appendAIMessage(`<div class="status-box status-error"><strong>❌ Lỗi kết nối:</strong> Không thể kết nối tới server.<br>${escapeHTML(error.message)}</div>`);
         scrollToBottom();
     }
 }
@@ -1044,7 +948,7 @@ async function saveChatToDB(userText, aiHtml, userImageBase64 = null) {
                 .eq('id', currentChatId);
 
             if (updateErr) throw updateErr;
-            
+
             if (titleRenamed && currentUser) {
                 loadChatHistory(currentUser.id);
             }
@@ -1057,15 +961,16 @@ async function saveChatToDB(userText, aiHtml, userImageBase64 = null) {
 function appendUserMessage(text, animate = true, imageBase64 = null) {
     const div = document.createElement('div');
     div.className = 'chat-bubble user-bubble' + (animate ? '' : ' no-animation');
-    
+
     let htmlContent = '';
-    if (imageBase64) {
-        htmlContent += `<img src="${imageBase64}" style="max-width:100%; max-height:200px; border-radius:8px; margin-bottom:8px; display:block;">`;
+    const safeImage = safeDataImageUrl(imageBase64);
+    if (safeImage) {
+        htmlContent += `<img src="${escapeHTML(safeImage)}" alt="Ảnh đính kèm" style="max-width:100%; max-height:200px; border-radius:8px; margin-bottom:8px; display:block;">`;
     }
     if (text) {
         htmlContent += escapeHTML(text).replace(/\n/g, '<br>');
     }
-    
+
     // Bọc nội dung tin nhắn và thanh công cụ
     div.innerHTML = `
         <div style="display: flex; flex-direction: column; align-items: flex-end;">
@@ -1080,7 +985,7 @@ function appendUserMessage(text, animate = true, imageBase64 = null) {
             </div>
         </div>
     `;
-    
+
     const contentDiv = div.querySelector('.bubble-content');
     contentDiv.addEventListener('contextmenu', (e) => {
         if (window.innerWidth <= 768) {
@@ -1088,21 +993,21 @@ function appendUserMessage(text, animate = true, imageBase64 = null) {
             mobileMenuContainer.style.display = 'flex';
             const clientX = e.clientX || (e.touches && e.touches[0].clientX) || 0;
             const clientY = e.clientY || (e.touches && e.touches[0].clientY) || 0;
-            
+
             setTimeout(() => {
                 const rect = mobileMenuContainer.getBoundingClientRect();
                 let left = clientX - (rect.width / 2);
                 if (left < 10) left = 10;
                 if (left + rect.width > window.innerWidth - 10) left = window.innerWidth - rect.width - 10;
-                
+
                 let top = clientY + 10;
                 if (top + rect.height > window.innerHeight - 10) top = clientY - rect.height - 10;
-                
+
                 mobileMenuContainer.style.left = left + 'px';
                 mobileMenuContainer.style.top = top + 'px';
                 mobileMenuContainer.style.opacity = '1';
             }, 10);
-            
+
             document.getElementById('mcm-edit').onclick = () => {
                 mobileMenuContainer.style.opacity = '0';
                 setTimeout(() => mobileMenuContainer.style.display = 'none', 200);
@@ -1117,7 +1022,7 @@ function appendUserMessage(text, animate = true, imageBase64 = null) {
             };
         }
     });
-    
+
     // Thêm event listeners cho các nút
     const copyBtn = div.querySelector('.copy-btn');
     if (copyBtn && text) {
@@ -1138,17 +1043,17 @@ function appendUserMessage(text, animate = true, imageBase64 = null) {
             const wrapper = div.querySelector('div');
             const contentDiv = div.querySelector('.bubble-content');
             const actionBar = div.querySelector('.user-action-bar');
-            
+
             contentDiv.style.display = 'none';
             actionBar.style.display = 'none';
-            
+
             const editContainer = document.createElement('div');
             editContainer.className = 'inline-edit-container';
             editContainer.style.width = '100%';
             editContainer.style.minWidth = '320px';
             editContainer.style.display = 'flex';
             editContainer.style.flexDirection = 'column';
-            
+
             const textarea = document.createElement('textarea');
             textarea.value = text;
             textarea.style.width = '100%';
@@ -1166,21 +1071,21 @@ function appendUserMessage(text, animate = true, imageBase64 = null) {
             textarea.style.color = 'var(--text-primary)';
             textarea.style.marginBottom = '10px';
             textarea.style.boxSizing = 'border-box';
-            
+
             // Thêm hiệu ứng focus
             textarea.onfocus = () => textarea.style.boxShadow = '0 0 0 2px rgba(96, 165, 250, 0.2)';
             textarea.onblur = () => textarea.style.boxShadow = 'none';
-            
+
             const adjustHeight = () => {
                 textarea.style.height = 'auto';
                 textarea.style.height = (textarea.scrollHeight) + 'px';
             };
-            
+
             const buttonRow = document.createElement('div');
             buttonRow.style.display = 'flex';
             buttonRow.style.justifyContent = 'flex-end';
             buttonRow.style.gap = '8px';
-            
+
             const cancelBtn = document.createElement('button');
             cancelBtn.textContent = 'Huỷ';
             cancelBtn.style.background = 'transparent';
@@ -1193,7 +1098,7 @@ function appendUserMessage(text, animate = true, imageBase64 = null) {
             cancelBtn.style.borderRadius = '999px';
             cancelBtn.onmouseover = () => cancelBtn.style.background = 'rgba(0,0,0,0.05)';
             cancelBtn.onmouseout = () => cancelBtn.style.background = 'transparent';
-            
+
             const saveBtn = document.createElement('button');
             saveBtn.textContent = 'Cập nhật';
             saveBtn.style.border = 'none';
@@ -1202,7 +1107,7 @@ function appendUserMessage(text, animate = true, imageBase64 = null) {
             saveBtn.style.fontSize = '14px';
             saveBtn.style.fontWeight = '500';
             saveBtn.style.transition = 'all 0.2s';
-            
+
             const updateSaveBtnState = () => {
                 if (textarea.value.trim() === '' || textarea.value === text) {
                     saveBtn.style.background = 'rgba(0, 0, 0, 0.1)';
@@ -1216,22 +1121,22 @@ function appendUserMessage(text, animate = true, imageBase64 = null) {
                     saveBtn.disabled = false;
                 }
             };
-            
+
             textarea.addEventListener('input', () => {
                 adjustHeight();
                 updateSaveBtnState();
             });
-            
+
             cancelBtn.onclick = () => {
                 editContainer.remove();
                 contentDiv.style.display = 'block';
                 actionBar.style.display = 'flex';
             };
-            
+
             saveBtn.onclick = () => {
                 const newText = textarea.value.trim();
                 if (!newText || newText === text) return;
-                
+
                 const messageInput = document.getElementById("message");
                 if (messageInput) {
                     messageInput.value = newText;
@@ -1242,14 +1147,14 @@ function appendUserMessage(text, animate = true, imageBase64 = null) {
                     sendMessage();
                 }
             };
-            
+
             buttonRow.appendChild(cancelBtn);
             buttonRow.appendChild(saveBtn);
             editContainer.appendChild(textarea);
             editContainer.appendChild(buttonRow);
-            
+
             wrapper.insertBefore(editContainer, actionBar);
-            
+
             setTimeout(() => {
                 adjustHeight();
                 updateSaveBtnState();
@@ -1292,9 +1197,12 @@ function appendAILoading(id) {
 function appendAIMessage(htmlContent, animate = true) {
     const div = document.createElement('div');
     div.className = 'chat-bubble ai-bubble' + (animate ? '' : ' no-animation');
+    const safeHtml = window.DOMPurify
+        ? DOMPurify.sanitize(String(htmlContent ?? ''), { FORBID_TAGS: ['script', 'style', 'iframe', 'object', 'embed'], FORBID_ATTR: ['onerror', 'onclick', 'onload'] })
+        : escapeHTML(htmlContent);
     div.innerHTML = `
         <div class="ai-avatar">✨</div>
-        <div class="bubble-content">${htmlContent}</div>
+        <div class="bubble-content">${safeHtml}</div>
     `;
     chatContainer.appendChild(div);
 }
@@ -1311,13 +1219,43 @@ function scrollToBottom() {
 
 // HÃ m chá»‘ng XSS khi render text cá»§a ngÆ°á» i dÃ¹ng
 function escapeHTML(str) {
-    return str.replace(/[&<>'"]/g, tag => ({
+    return String(str ?? '').replace(/[&<>'"]/g, tag => ({
         '&': '&amp;',
         '<': '&lt;',
         '>': '&gt;',
         "'": '&#39;',
         '"': '&quot;'
     }[tag]));
+}
+
+function safeImageUrl(value) {
+    try {
+        const url = new URL(String(value || ''));
+        return url.protocol === 'https:' ? url.href : '';
+    } catch {
+        return '';
+    }
+}
+
+function safeDataImageUrl(value) {
+    if (typeof value !== 'string') return '';
+    return /^data:image\/(?:png|jpe?g|webp|gif);base64,[A-Za-z0-9+/=]+$/i.test(value) ? value : '';
+}
+
+function safeHref(value) {
+    try {
+        const url = new URL(String(value || ''));
+        return url.protocol === 'https:' ? url.href : '#';
+    } catch {
+        return '#';
+    }
+}
+
+function renderMarkdown(value) {
+    const html = window.marked ? marked.parse(String(value ?? '')) : escapeHTML(value);
+    return window.DOMPurify
+        ? DOMPurify.sanitize(html, { USE_PROFILES: { html: true }, FORBID_TAGS: ['script', 'style', 'iframe', 'object', 'embed'], FORBID_ATTR: ['style', 'onerror', 'onclick', 'onload'] })
+        : escapeHTML(value);
 }
 
 async function fetchDocumentSearch(message) {
@@ -1345,15 +1283,15 @@ async function fetchDocumentSearch(message) {
             signal: controller.signal
         });
         clearTimeout(timeoutId);
-        
+
         const workerData = await response.json();
 
         if (workerData.success && workerData.files && workerData.files.length > 0) {
             const files = workerData.files;
-            
+
             // Thuáº­t toÃ¡n bÃ³c tÃ¡ch tá»« khÃ³a báº±ng Javascript (Tá»‘c Ä‘á»™: 1ms, khÃ´ng tá»‘n API)
             let keyword = message.toLowerCase().trim();
-            
+
             // 1. Xóa các cụm từ mào đầu
             const prefixes = ["làm ơn", "bạn ơi", "cho mình xin", "cho tôi xin", "tìm giúp", "tìm kiếm", "tìm", "xin", "có", "bạn có", "hãy tìm"];
             for (let p of prefixes) {
@@ -1361,7 +1299,7 @@ async function fetchDocumentSearch(message) {
                     keyword = keyword.substring(p.length).trim();
                 }
             }
-            
+
             // 2. Xóa các cụm từ đuôi
             const suffixes = ["không", "nhé", "nha", "với", "đi", "giúp mình", "giúp tôi", "ạ", "không vậy", "không ạ"];
             for (let s of suffixes) {
@@ -1369,7 +1307,7 @@ async function fetchDocumentSearch(message) {
                     keyword = keyword.substring(0, keyword.length - s.length).trim();
                 }
             }
-            
+
             // 3. Xóa các từ chung chung chỉ loại file
             keyword = keyword.replace(/tài liệu|file|bài tập|đề thi|tóm tắt|lý thuyết|chuyên đề|thư mục|folder|sách|đáp án|hướng dẫn|ôn tập|ôn thi|đề cương|kiểm tra|môn|về|của|cho|các|lớp|khối|bài|chương|phần/gi, "").trim();
 
@@ -1381,29 +1319,29 @@ async function fetchDocumentSearch(message) {
             const normalize = (str) => {
                 if (!str) return "";
                 return str.normalize("NFD")
-                          .replace(/[\u0300-\u036f]/g, "") // Xóa dấu tiếng Việt
-                          .replace(/đ/g, "d").replace(/Đ/g, "D") // Sửa lỗi chữ đ
-                          .toLowerCase()
-                          .replace(/[^a-z0-9]/g, ""); // Xóa toàn bộ kí tự đặc biệt, dấu cách, giữ chữ & số
+                    .replace(/[\u0300-\u036f]/g, "") // Xóa dấu tiếng Việt
+                    .replace(/đ/g, "d").replace(/Đ/g, "D") // Sửa lỗi chữ đ
+                    .toLowerCase()
+                    .replace(/[^a-z0-9]/g, ""); // Xóa toàn bộ kí tự đặc biệt, dấu cách, giữ chữ & số
             };
-            
+
             // Hàm chuẩn hóa thành mảng từ (chữ và số)
             const normalizeWords = (str) => {
                 if (!str) return [];
                 return str.normalize("NFD")
-                          .replace(/[\u0300-\u036f]/g, "") 
-                          .replace(/đ/g, "d").replace(/Đ/g, "D") 
-                          .toLowerCase()
-                          .replace(/[^a-z0-9]/g, " ") // Biến mọi ký tự đặc biệt thành dấu cách
-                          .split(/\s+/) // Cắt theo dấu cách
-                          .filter(w => w.length > 0);
+                    .replace(/[\u0300-\u036f]/g, "")
+                    .replace(/đ/g, "d").replace(/Đ/g, "D")
+                    .toLowerCase()
+                    .replace(/[^a-z0-9]/g, " ") // Biến mọi ký tự đặc biệt thành dấu cách
+                    .split(/\s+/) // Cắt theo dấu cách
+                    .filter(w => w.length > 0);
             };
 
             const searchKey = normalize(keyword);
             const queryWords = normalizeWords(keyword);
-            
+
             if (searchKey.length < 3) {
-                 return { success: false, error: `Từ khóa quá ngắn để tìm kiếm tài liệu.`, skipErrorUI: true };
+                return { success: false, error: `Từ khóa quá ngắn để tìm kiếm tài liệu.`, skipErrorUI: true };
             }
 
             // Hàm lấy tên đầy đủ bao gồm thư mục cha
@@ -1429,11 +1367,11 @@ async function fetchDocumentSearch(message) {
                 const fullName = getFullPathName(f);
                 const fName = normalize(fullName);
                 const fWords = normalizeWords(fullName);
-                
+
                 if (fName.includes(searchKey)) return true;
                 if (queryWords.length > 0 && queryWords.every(w => fWords.includes(w))) return true;
                 if (fWords.length > 0 && fWords.every(w => queryWords.includes(w))) return true;
-                
+
                 return false;
             });
 
@@ -1442,7 +1380,7 @@ async function fetchDocumentSearch(message) {
             if (hasFolder) {
                 finalFiles = finalFiles.filter(f => f.type === 'folder');
             }
-            
+
             if (finalFiles.length === 0) {
                 const sampleFiles = files.slice(0, 5).map(f => f.name).join(", ");
                 return { success: false, error: `Hệ thống không tìm thấy tài liệu nào có tên chứa từ khóa: "${keyword}" (chuẩn hóa: ${searchKey}). Đã quét tổng cộng ${files.length} tài liệu từ Google Drive của bạn. Các file hệ thống quét được ví dụ như: [${sampleFiles}]. Vui lòng kiểm tra xem bạn đã copy đúng FOLDER_IDS trên Cloudflare chưa!` };
@@ -1461,7 +1399,7 @@ async function fetchDocumentSearch(message) {
                 files: finalFiles
             };
         }
-        
+
         return workerData;
     } catch (err) {
         if (err.name === 'AbortError') {
@@ -1499,7 +1437,7 @@ async function fetchGeminiResponse(message, documentText, files, previousMessage
                 // Xóa html phụ trợ để Gemini tập trung nội dung chính
                 rawContent = rawContent.replace(/<div class="status-box[^>]*>.*?<\/div>/gs, '');
                 rawContent = rawContent.replace(/<div class="worker-results[^>]*>.*?<\/div>/gs, '');
-                rawContent = rawContent.replace(/<[^>]*>?/gm, ''); 
+                rawContent = rawContent.replace(/<[^>]*>?/gm, '');
             }
             const parts = [];
             if (msg.image) {
@@ -1553,11 +1491,11 @@ async function fetchGeminiResponse(message, documentText, files, previousMessage
         const endpoint = onUpdate ? 'streamGenerateContent?alt=sse' : 'generateContent';
         const targetPath = `/v1beta/models/${selectedModel}:${endpoint}`;
         const url = `${WORKER_URL}gemini-proxy?path=${encodeURIComponent(targetPath)}`;
-        
+
         try {
             const response = await fetch(url, {
                 method: 'POST',
-                headers: { 
+                headers: {
                     'Content-Type': 'application/json'
                 },
                 body: JSON.stringify(requestBody)
@@ -1575,7 +1513,7 @@ async function fetchGeminiResponse(message, documentText, files, previousMessage
                     } else if (data.error) {
                         errorMsg = typeof data.error === 'string' ? data.error : JSON.stringify(data.error);
                     }
-                } catch(e) { }
+                } catch (e) { }
                 throw new Error(errorMsg);
             }
 
@@ -1605,7 +1543,7 @@ async function fetchGeminiResponse(message, documentText, files, previousMessage
                                 if (data.candidates && data.candidates.length > 0 && data.candidates[0].content && data.candidates[0].content.parts) {
                                     parsedText += data.candidates[0].content.parts[0].text;
                                 }
-                            } catch (e) {}
+                            } catch (e) { }
                         }
                     }
                     if (onUpdate) onUpdate(parsedText);
@@ -1622,12 +1560,12 @@ async function fetchGeminiResponse(message, documentText, files, previousMessage
 
             while (true) {
                 const { value, done } = await reader.read();
-                
+
                 if (value) {
                     buffer += decoder.decode(value, { stream: !done });
                     let lines = buffer.split('\n');
-                    buffer = lines.pop(); 
-                    
+                    buffer = lines.pop();
+
                     for (let line of lines) {
                         if (line.startsWith('data: ')) {
                             const dataStr = line.slice(6).trim();
@@ -1642,7 +1580,7 @@ async function fetchGeminiResponse(message, documentText, files, previousMessage
                                         lastUpdate = now;
                                     }
                                 }
-                            } catch (e) {}
+                            } catch (e) { }
                         }
                     }
                 }
@@ -1656,7 +1594,7 @@ async function fetchGeminiResponse(message, documentText, files, previousMessage
                                 if (data.candidates && data.candidates.length > 0 && data.candidates[0].content && data.candidates[0].content.parts) {
                                     fullText += data.candidates[0].content.parts[0].text;
                                 }
-                            } catch (e) {}
+                            } catch (e) { }
                         }
                     }
                     onUpdate(fullText); // Gọi callback lần cuối khi hoàn thành để render nội dung cuối cùng
@@ -1664,11 +1602,11 @@ async function fetchGeminiResponse(message, documentText, files, previousMessage
                 }
             }
             return fullText;
-            
+
         } catch (e) {
             // Lá»—i máº¡ng hoáº·c lá»—i tá»± nÃ©m (nhÆ° háº¿t key)
             if (e.message.includes("Tất cả") || !e.message.includes("Failed to fetch")) {
-                throw e; 
+                throw e;
             }
             console.error("Lỗi kết nối khi gọi Gemini:", e);
             throw e;
@@ -1691,10 +1629,10 @@ const logoutBtn = document.getElementById('logoutBtn');
 function loadSettings() {
     const savedTheme = localStorage.getItem('theme') || 'light';
     const savedGradient = localStorage.getItem('gradient') || 'default';
-    
+
     applyTheme(savedTheme);
     applyGradient(savedGradient);
-    
+
     updateCheckIcons('themeSubMenu', savedTheme);
     updateCheckIcons('gradientSubMenu', savedGradient);
 }
@@ -1738,7 +1676,7 @@ if (userProfile && accountModal) {
     userProfile.addEventListener('click', (e) => {
         // Chá»‰ má»Ÿ khi click vÃ o userProfile, khÃ´ng pháº£i cÃ¡c icon bÃªn trong
         if (e.target.closest('#settingsBtn') || e.target.closest('#logoutBtn')) return;
-        
+
         accountModal.classList.add('active');
         if (settingsDropdown) settingsDropdown.classList.remove('active');
     });
@@ -1756,7 +1694,7 @@ if (settingsBtn && settingsDropdown) {
         e.stopPropagation(); // KhÃ´ng cho lan ra userProfile
         settingsDropdown.classList.toggle('active');
         if (accountModal) accountModal.classList.remove('active');
-        
+
         // Ä Ã³ng cÃ¡c submenu Ä‘ang má»Ÿ
         document.querySelectorAll('.has-submenu').forEach(el => el.classList.remove('active'));
     });
@@ -1844,12 +1782,12 @@ if (toggleAccountsBtn && accountListSection) {
 document.querySelectorAll('.has-submenu').forEach(item => {
     item.addEventListener('click', (e) => {
         e.stopPropagation();
-        
+
         // Ä Ã³ng cÃ¡c submenu khÃ¡c
         document.querySelectorAll('.has-submenu').forEach(el => {
             if (el !== item) el.classList.remove('active');
         });
-        
+
         item.classList.toggle('active');
     });
 });
@@ -1927,12 +1865,12 @@ if (mobileMenuBtn && sidebar && sidebarOverlay) {
         sidebar.classList.toggle('mobile-open');
         sidebarOverlay.classList.toggle('active');
     });
-    
+
     sidebarOverlay.addEventListener('click', () => {
         sidebar.classList.remove('mobile-open');
         sidebarOverlay.classList.remove('active');
     });
-    
+
     const closeSidebarBtn = document.getElementById('closeSidebarBtn');
     if (closeSidebarBtn) {
         closeSidebarBtn.addEventListener('click', () => {
@@ -1952,7 +1890,7 @@ const chatOptionsMenu = document.getElementById('chatOptionsMenu');
 
 function openChatMenu(e, chatId, chatTitle, btnElement) {
     if (!chatOptionsMenu) return;
-    
+
     currentMenuChatId = chatId;
     currentMenuChatTitle = chatTitle;
 
@@ -1960,7 +1898,7 @@ function openChatMenu(e, chatId, chatTitle, btnElement) {
     const userIdKey = currentUser ? currentUser.id : 'local';
     const pinnedChats = JSON.parse(localStorage.getItem('pinnedChats_' + userIdKey) || "[]");
     const isPinned = pinnedChats.includes(chatId);
-    
+
     // Update Pin option text and icon
     const optPin = document.getElementById('optPin');
     if (optPin) {
@@ -1974,32 +1912,32 @@ function openChatMenu(e, chatId, chatTitle, btnElement) {
             <span style="color: #f59e0b;">Ghim</span>`;
         }
     }
-    
+
     // Reset position to allow calculation
     chatOptionsMenu.style.display = 'block';
-    
+
     // Position menu near the button
     const rect = btnElement.getBoundingClientRect();
-    
+
     let leftPos = rect.left + window.scrollX;
     const menuWidth = chatOptionsMenu.offsetWidth || 200;
     const menuHeight = chatOptionsMenu.offsetHeight || 250;
-    
+
     // Prevent menu from overflowing the right edge of the screen
     if (leftPos + menuWidth > window.innerWidth) {
         leftPos = window.innerWidth - menuWidth - 10;
     }
-    
+
     let topPos = rect.bottom + window.scrollY;
-    
+
     // Nếu menu bị che khuất ở dưới cùng, đẩy nó lộn ngược lên trên
     if (rect.bottom + menuHeight > window.innerHeight) {
         topPos = rect.top + window.scrollY - menuHeight - 5;
     }
-    
+
     chatOptionsMenu.style.top = `${topPos}px`;
     chatOptionsMenu.style.left = `${leftPos}px`;
-    
+
     chatOptionsMenu.classList.add('active');
     chatOptionsMenu.style.display = ''; // Let css class handle it
 }
@@ -2017,18 +1955,18 @@ async function renameChat(chatId, newTitle) {
     }
 
     if (!supabaseClient) return;
-    
+
     const { error } = await supabaseClient
         .from('chats')
         .update({ title: newTitle })
         .eq('id', chatId);
-        
+
     if (error) {
         console.error("Lá»—i khi Ä‘á»•i tÃªn chat:", error);
         alert("CÃ³ lá»—i xáº£y ra khi Ä‘á»•i tÃªn.");
         return;
     }
-    
+
     if (currentUser) {
         loadChatHistory(currentUser.id);
     }
@@ -2039,34 +1977,34 @@ async function deleteChat(chatId) {
         let localChats = JSON.parse(localStorage.getItem('localChats') || '[]');
         localChats = localChats.filter(c => c.id !== chatId);
         localStorage.setItem('localChats', JSON.stringify(localChats));
-        
+
         if (currentChatId === chatId) {
             currentChatId = null;
             chatContainer.innerHTML = '<div class="empty-chat-message" style="display:flex; height:100%; align-items:center; justify-content:center; color:var(--text-secondary);">Chọn một cuộc trò chuyện hoặc tạo mới</div>';
         }
-        
+
         loadChatHistory(currentUser ? currentUser.id : null);
         return;
     }
 
     if (!supabaseClient) return;
-    
+
     const { error } = await supabaseClient
         .from('chats')
         .delete()
         .eq('id', chatId);
-        
+
     if (error) {
         console.error("Lá»—i khi xÃ³a chat:", error);
         alert("CÃ³ lá»—i xáº£y ra khi xÃ³a cuá»™c trÃ² chuyá»‡n.");
         return;
     }
-    
+
     if (currentChatId === chatId) {
         currentChatId = null;
         chatContainer.innerHTML = '<div class="empty-chat-message" style="display:flex; height:100%; align-items:center; justify-content:center; color:var(--text-secondary);">Chọn một cuộc trò chuyện hoặc tạo mới</div>';
     }
-    
+
     if (currentUser) {
         loadChatHistory(currentUser.id);
     }
@@ -2082,16 +2020,16 @@ if (optRename && renameModalOverlay) {
     optRename.addEventListener('click', () => {
         if (!currentMenuChatId) return;
         chatOptionsMenu.classList.remove('active');
-        
+
         renameInput.value = currentMenuChatTitle;
         renameModalOverlay.classList.add('active');
         renameInput.focus();
     });
-    
+
     cancelRenameBtn.addEventListener('click', () => {
         renameModalOverlay.classList.remove('active');
     });
-    
+
     confirmRenameBtn.addEventListener('click', async () => {
         const newTitle = renameInput.value.trim();
         if (newTitle && currentMenuChatId) {
@@ -2112,11 +2050,11 @@ if (optDelete && deleteModalOverlay) {
         chatOptionsMenu.classList.remove('active');
         deleteModalOverlay.classList.add('active');
     });
-    
+
     cancelDeleteBtn.addEventListener('click', () => {
         deleteModalOverlay.classList.remove('active');
     });
-    
+
     confirmDeleteBtn.addEventListener('click', async () => {
         if (currentMenuChatId) {
             deleteModalOverlay.classList.remove('active');
@@ -2138,14 +2076,14 @@ if (optDeleteAll) {
                     .from('chats')
                     .delete()
                     .eq('user_id', currentUser.id);
-                    
+
                 if (error) {
                     console.error("Lỗi khi xóa tất cả chat:", error);
                     alert("Có lỗi xảy ra khi xóa tất cả cuộc trò chuyện.");
                     return;
                 }
             }
-            
+
             currentChatId = null;
             chatContainer.innerHTML = `
                 <div class="welcome-screen" id="welcomeScreen">
@@ -2163,7 +2101,7 @@ if (optPin) {
     optPin.addEventListener('click', () => {
         if (!currentMenuChatId) return;
         chatOptionsMenu.classList.remove('active');
-        
+
         const userIdKey = currentUser ? currentUser.id : 'local';
         let pinnedChats = JSON.parse(localStorage.getItem('pinnedChats_' + userIdKey) || "[]");
         if (pinnedChats.includes(currentMenuChatId)) {
@@ -2172,7 +2110,7 @@ if (optPin) {
             pinnedChats.push(currentMenuChatId);
         }
         localStorage.setItem('pinnedChats_' + userIdKey, JSON.stringify(pinnedChats));
-        
+
         loadChatHistory(currentUser ? currentUser.id : null);
     });
 }
@@ -2215,11 +2153,11 @@ const guideModalOverlay = document.getElementById('guideModalOverlay');
 const guideCloseBtn = document.getElementById('guideCloseBtn');
 
 function openGuide() {
-    if(guideModalOverlay) guideModalOverlay.classList.add('show');
+    if (guideModalOverlay) guideModalOverlay.classList.add('show');
 }
 
 function closeGuide() {
-    if(guideModalOverlay) guideModalOverlay.classList.remove('show');
+    if (guideModalOverlay) guideModalOverlay.classList.remove('show');
 }
 
 if (guideBtn) guideBtn.addEventListener('click', openGuide);
