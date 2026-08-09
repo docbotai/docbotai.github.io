@@ -752,6 +752,18 @@ body.dark-mode .chat-options-btn:hover {
     color: var(--text-primary);
 }
 
+.streaming-response {
+    min-width: 0;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+    contain: content;
+}
+
+.chat-bubble.no-animation {
+    content-visibility: auto;
+    contain-intrinsic-size: auto 160px;
+}
+
 .markdown-body p {
     margin-bottom: 12px;
 }
@@ -990,6 +1002,22 @@ body.dark-mode .chat-options-btn:hover {
     .ai-bubble {
         flex-direction: column;
         gap: 8px;
+    }
+
+    .chat-bubble {
+        animation-duration: 0.2s;
+    }
+
+    .streaming-response {
+        line-height: 1.55;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .chat-bubble,
+    .loading-dots span {
+        animation: none !important;
+        transition: none !important;
     }
 }
 
