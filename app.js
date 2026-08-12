@@ -1261,7 +1261,9 @@ async function fetchDocumentSearch(message) {
     const lowerMsg = message.toLowerCase();
     const searchIntent = /(?:^|\s)(?:tìm|tim|tra|truy\s*cứu|truy\s*cuu|mở|mo|đọc|doc|xem|xin)(?=\s|$)/i.test(lowerMsg);
     const documentIntent = /(?:^|\s)(?:tài\s*liệu|tai\s*lieu|file|tệp|tep|thư\s*mục|thu\s*muc|folder|chuyên\s*đề|chuyen\s*de|đề\s*thi|de\s*thi|bài\s*tập|bai\s*tap)(?=\s|$)/i.test(lowerMsg);
-    if (!directFileId && !(searchIntent && documentIntent)) {
+    const genericDocumentRequest = /^(?:tài\s*liệu|tai\s*lieu|file|tệp|tep|thư\s*mục|thu\s*muc|folder)[?.!\s]*$/i.test(lowerMsg);
+    const hasDocumentSearchQuery = documentIntent && !genericDocumentRequest;
+    if (!directFileId && !(searchIntent && documentIntent) && !hasDocumentSearchQuery) {
         return { success: true, question: message, files: [] };
     }
 
@@ -1322,7 +1324,7 @@ async function fetchDocumentSearch(message) {
             }
 
             // 3. Xóa các từ chung chung chỉ loại file (sử dụng regex với khoảng trắng để tránh xóa nhầm trong từ)
-            const stopWordsList = ["tài liệu", "file", "bài tập", "đề thi", "tóm tắt", "lý thuyết", "thư mục", "folder", "sách", "đáp án", "hướng dẫn", "ôn tập", "ôn thi", "đề cương", "kiểm tra", "môn", "về", "của", "cho", "các", "lớp", "khối", "bài", "chương", "phần", "trong", "ở", "thuộc", "những", "học"];
+            const stopWordsList = ["tài liệu", "file", "bài tập", "đề thi", "tóm tắt", "lý thuyết", "thư mục con", "thư mục", "folder", "sách", "đáp án", "hướng dẫn", "ôn tập", "ôn thi", "đề cương", "kiểm tra", "nằm trong", "bên trong", "vị trí", "có tên", "nằm", "bên", "tên", "được", "đặt", "con", "môn", "về", "của", "cho", "các", "lớp", "khối", "bài", "chương", "phần", "trong", "ở", "thuộc", "những", "học"];
             
             for (let i = 0; i < 2; i++) { // Lặp 2 lần để xóa triệt để các từ đứng liền nhau
                 for (let word of stopWordsList) {
