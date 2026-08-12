@@ -105,134 +105,66 @@ const handleGoogleLogin = async () => {
     }
 };
 
-// Xá»­ lÃ½ nÃºt Ä Äƒng nháº­p Google
-document.getElementById('googleLoginBtn')?.addEventListener('click', handleGoogleLogin);
-document.getElementById('sidebarLoginBtn')?.addEventListener('click', handleGoogleLogin);
-document.getElementById('logoArea')?.addEventListener('click', () => location.reload());
+function handleUserLogin(user) {
+    currentUser = user;
+    const email = user?.email || '';
+    const metadata = user?.user_metadata || {};
+    const fullName = metadata.full_name || metadata.name || email || 'bạn';
+    const firstName = fullName.trim().split(/\s+/).pop();
+    const avatarUrl = metadata.avatar_url || metadata.picture || '';
+    const googleLoginBtn = document.getElementById('googleLoginBtn');
+    const sidebarLoginBtn = document.getElementById('sidebarLoginBtn');
+    const topAvatar = document.getElementById('topAvatar');
+    const userProfile = document.getElementById('userProfile');
+    const modalEmail = document.getElementById('modalEmail');
+    const modalGreeting = document.getElementById('modalGreeting');
+    const accountModalAvatar = document.getElementById('accountModalAvatar');
 
-// Kiá»ƒm tra phiÃªn Ä‘Äƒng nháº­p khi táº£i trang
-window.addEventListener('load', async () => {
-    // áº¨n hiá»‡u á»©ng loading
+    if (googleLoginBtn) googleLoginBtn.style.display = 'none';
+    if (sidebarLoginBtn) sidebarLoginBtn.style.display = 'none';
+    if (userProfile) userProfile.style.display = 'flex';
+    if (topAvatar) {
+        topAvatar.style.display = 'flex';
+        topAvatar.innerHTML = avatarUrl
+            ? `<img src="${escapeHTML(avatarUrl)}" alt="Avatar" style="width: 100%; height: 100%; border-radius: 50%; object-fit: cover;">`
+            : escapeHTML(firstName.charAt(0).toUpperCase());
+    }
+    if (modalEmail) modalEmail.textContent = email;
+    if (modalGreeting) modalGreeting.textContent = `Chào ${firstName},`;
+    if (accountModalAvatar) {
+        accountModalAvatar.innerHTML = avatarUrl
+            ? `<img src="${escapeHTML(avatarUrl)}" alt="Avatar" style="width: 100%; border-radius: 50%;">`
+            : '';
+    }
+
+    renderMockAccounts(email);
+    loadChatHistory(user.id);
+}
+
+document.addEventListener('DOMContentLoaded', async () => {
     const pageLoader = document.getElementById('pageLoader');
     if (pageLoader) {
         pageLoader.classList.add('hidden');
         setTimeout(() => pageLoader.style.display = 'none', 600);
     }
 
-    if (!supabaseClient) return;
+    document.getElementById('googleLoginBtn')?.addEventListener('click', handleGoogleLogin);
+    document.getElementById('sidebarLoginBtn')?.addEventListener('click', handleGoogleLogin);
 
-    // Láº¥y session hiá»‡n táº¡i
-    const { data: { session } } = await supabaseClient.auth.getSession();
-
-    if (session) {
-        handleUserLogin(session.user);
-    } else {
+    if (!supabaseClient) {
         loadChatHistory(null);
+        return;
     }
 
-    // Láº¯ng nghe sá»± thay Ä‘á»•i tráº¡ng thÃ¡i Ä‘Äƒng nháº­p
-    supabaseClient.auth.onAuthStateChange((event, session) => {
-        if (event === 'SIGNED_IN' && session) {
-            handleUserLogin(session.user);
-        } else if (event === 'SIGNED_OUT') {
-            handleUserLogout();
-        }
+    const { data } = await supabaseClient.auth.getUser();
+    if (data?.user) handleUserLogin(data.user);
+    else loadChatHistory(null);
+
+    supabaseClient.auth.onAuthStateChange((_event, user) => {
+        if (user) handleUserLogin(user);
+        else handleUserLogout();
     });
-
-    // Tá»± Ä‘á»™ng táº£i danh sÃ¡ch model mÃ  API Key há»— trá»£
-    // loadAvailableModels();
 });
-
-async function loadAvailableModels() {
-    try {
-        const targetPath = '/v1beta/models';
-        const url = `${WORKER_URL}gemini-proxy?path=${encodeURIComponent(targetPath)}`;
-        const response = await fetch(url, {
-            headers: {
-                'Content-Type': 'application/json'
-            }
-        });
-        const data = await response.json();
-
-        if (data.models) {
-            const select = document.getElementById('modelSelect');
-            select.innerHTML = ''; // XÃ³a cÃ¡c lá»±a chá»n cÅ©
-
-            data.models.forEach(model => {
-                // Chá»‰ láº¥y nhá»¯ng model há»— trá»£ generateContent (Chat)
-                if (model.supportedGenerationMethods && model.supportedGenerationMethods.includes("generateContent")) {
-                    const option = document.createElement('option');
-                    // data tráº£ vá» dáº¡ng "models/gemini-pro", ta chá»‰ cáº§n chuá»—i Ä‘áº±ng sau
-                    option.value = model.name.replace('models/', '');
-                    option.textContent = model.displayName || option.value;
-                    select.appendChild(option);
-                }
-            });
-            // Tá»± Ä‘á»™ng chá»n gemini-flash-latest hoáº·c gemini-3.5-flash lÃ m máº·c Ä‘á»‹nh náº¿u cÃ³
-            if (Array.from(select.options).some(opt => opt.value === 'gemini-flash-latest')) {
-                select.value = 'gemini-flash-latest';
-            } else if (Array.from(select.options).some(opt => opt.value === 'gemini-3.5-flash')) {
-                select.value = 'gemini-3.5-flash';
-            } else if (Array.from(select.options).some(opt => opt.value === 'gemini-3.1-flash-lite')) {
-                select.value = 'gemini-3.1-flash-lite';
-            }
-
-            console.log("ÄÃ£ táº£i danh sÃ¡ch Model thÃ nh cÃ´ng!");
-        } else if (data.error) {
-            console.error("Lá»—i API Key khi láº¥y danh sÃ¡ch model:", data.error.message);
-        }
-    } catch (e) {
-        console.error("KhÃ´ng thá»ƒ táº£i danh sÃ¡ch model:", e);
-    }
-}
-
-function handleUserLogin(user) {
-    currentUser = user;
-
-    // áº¨n nÃºt Ä‘Äƒng nháº­p, hiá»‡n avatar
-    const googleLoginBtn = document.getElementById('googleLoginBtn');
-    if (googleLoginBtn) googleLoginBtn.style.display = 'none';
-
-    const sidebarLoginBtn = document.getElementById('sidebarLoginBtn');
-    if (sidebarLoginBtn) sidebarLoginBtn.style.display = 'none';
-
-    // Avatar gÃ³c trÃªn
-    const topAvatar = document.getElementById('topAvatar');
-    const avatarUrl = safeImageUrl(user.user_metadata?.avatar_url);
-    if (topAvatar) {
-        topAvatar.style.display = 'block';
-        topAvatar.innerHTML = avatarUrl ? `<img src="${escapeHTML(avatarUrl)}" alt="Avatar" style="width: 100%; border-radius: 50%;">` : '';
-    }
-
-    // Profile gÃ³c dÆ°á»›i
-    const userProfile = document.getElementById('userProfile');
-    if (userProfile) {
-        userProfile.style.display = 'flex';
-        document.getElementById('userAvatar').innerHTML = avatarUrl ? `<img src="${escapeHTML(avatarUrl)}" alt="Avatar" style="width: 100%; border-radius: 50%;">` : '';
-        document.getElementById('userName').textContent = user.user_metadata?.full_name || user.email || 'Người dùng';
-    }
-
-    // Cáº­p nháº­t thÃ´ng tin trong Account Modal
-    const modalEmail = document.getElementById('modalEmail');
-    const modalGreeting = document.getElementById('modalGreeting');
-    const accountModalAvatar = document.getElementById('accountModalAvatar');
-
-    if (modalEmail) modalEmail.textContent = user.email;
-    if (modalGreeting) {
-        const nameParts = (user.user_metadata?.full_name || user.email || 'bạn').split(' ');
-        const firstName = nameParts[nameParts.length - 1];
-        modalGreeting.textContent = `Chào ${firstName},`;
-    }
-    if (accountModalAvatar) {
-        accountModalAvatar.innerHTML = avatarUrl ? `<img src="${escapeHTML(avatarUrl)}" alt="Avatar" style="width: 100%; border-radius: 50%;">` : '';
-    }
-
-    // Render các tài khoản phụ
-    renderMockAccounts(user.email);
-
-    // TODO: Tải lịch sử chat từ cơ sở dữ liệu (Giai đoạn 3)
-    loadChatHistory(user.id);
-}
 
 function renderMockAccounts(currentEmail) {
     const allAccounts = [
@@ -817,7 +749,11 @@ async function sendMessage() {
                 // HOẶC nếu câu đó KHÔNG PHẢI là câu giao tiếp (như gõ tên file cụ thể)
                 if (isSearchIntent || (!isConversational && message.length >= 5)) {
                     const errorStr = typeof workerData.error === 'string' ? workerData.error : (workerData.error.message || JSON.stringify(workerData.error));
-                    workerHtml += `<div class="status-box status-warning">Lỗi tìm tài liệu: ${escapeHTML(errorStr)}</div>`;
+                    if (workerData.isNotFound) {
+                        workerHtml += `<div class="status-box" style="background: #f8f9fa; color: #5f6368; border-left: 3px solid #dadce0; margin-bottom: 10px;">ℹ️ ${escapeHTML(errorStr)}</div>`;
+                    } else {
+                        workerHtml += `<div class="status-box status-warning">Lỗi tìm tài liệu: ${escapeHTML(errorStr)}</div>`;
+                    }
                 }
             }
         } catch (e) {
@@ -1306,7 +1242,225 @@ function createStreamingRenderer(element) {
     };
 }
 
-// HÃ m chá»‘ng XSS khi render text cá»§a ngÆ°á» i dÃ¹ng
+async function fetchDocumentSearch(message) {
+    // Bỏ qua nếu tin nhắn rỗng
+    if (!message || message.trim() === "") {
+        return { success: true, question: message, files: [] };
+    }
+
+    // Nhận diện link Google Drive trực tiếp
+    const driveLinkMatch = message.match(/drive\.google\.com\/file\/d\/([a-zA-Z0-9_-]+)/);
+    let directFileId = null;
+    if (driveLinkMatch) {
+        directFileId = driveLinkMatch[1];
+    }
+
+    // Kích hoạt tìm kiếm khi người dùng có ý định tìm/tra/mở tài liệu.
+    // Trước đây chỉ nhận đúng cụm "tìm tài liệu", khiến các câu như
+    // "tìm chuyên đề rút gọn" hoặc "tra file ..." bị bỏ qua hoàn toàn.
+    const lowerMsg = message.toLowerCase();
+    const searchIntent = /(?:^|\s)(?:tìm|tim|tra|truy\s*cứu|truy\s*cuu|mở|mo|đọc|doc|xem|xin)(?=\s|$)/i.test(lowerMsg);
+    const documentIntent = /(?:^|\s)(?:tài\s*liệu|tai\s*lieu|file|tệp|tep|thư\s*mục|thu\s*muc|folder|chuyên\s*đề|chuyen\s*de|đề\s*thi|de\s*thi|bài\s*tập|bai\s*tap)(?=\s|$)/i.test(lowerMsg);
+    if (!directFileId && !(searchIntent && documentIntent)) {
+        return { success: true, question: message, files: [] };
+    }
+
+    try {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 45000); // Tối đa 45s cho tìm kiếm tài liệu
+
+        const response = await fetch(WORKER_URL, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ message: message }),
+            signal: controller.signal
+        });
+        clearTimeout(timeoutId);
+
+        const workerData = await response.json();
+
+        if (workerData.success && workerData.files && workerData.files.length > 0) {
+            const files = workerData.files;
+
+            if (directFileId) {
+                // Nếu người dùng dán link, tìm file đó trong danh sách hoặc tạo giả định
+                let foundFile = files.find(f => f.id === directFileId);
+                if (!foundFile) {
+                    foundFile = {
+                        id: directFileId,
+                        name: "Tài liệu từ đường dẫn chia sẻ",
+                        type: "file",
+                        mimeType: "application/pdf" // default fallback
+                    };
+                }
+                return {
+                    success: true,
+                    question: message,
+                    files: [foundFile]
+                };
+            }
+
+            // Thuật toán bóc tách từ khóa bằng Javascript (Tốc độ: 1ms, không tốn API)
+            let keyword = message.toLowerCase().trim();
+
+            // 1. Xóa các cụm từ mào đầu
+            const prefixes = ["làm ơn", "bạn ơi", "cho mình xin", "cho tôi xin", "tìm giúp", "tìm kiếm", "truy cứu", "truy cuu", "tìm", "tra", "xin", "có", "bạn có", "hãy tìm", "mở", "đọc", "xem"];
+            for (let p of prefixes) {
+                if (keyword.startsWith(p)) {
+                    keyword = keyword.substring(p.length).trim();
+                }
+            }
+
+            // 2. Xóa các cụm từ đuôi
+            const suffixes = ["không", "nhé", "nha", "với", "đi", "giúp mình", "giúp tôi", "ạ", "không vậy", "không ạ"];
+            for (let s of suffixes) {
+                if (keyword.endsWith(s)) {
+                    keyword = keyword.substring(0, keyword.length - s.length).trim();
+                }
+            }
+
+            // 3. Xóa các từ chung chung chỉ loại file (sử dụng regex với khoảng trắng để tránh xóa nhầm trong từ)
+            const stopWordsList = ["tài liệu", "file", "bài tập", "đề thi", "tóm tắt", "lý thuyết", "thư mục", "folder", "sách", "đáp án", "hướng dẫn", "ôn tập", "ôn thi", "đề cương", "kiểm tra", "môn", "về", "của", "cho", "các", "lớp", "khối", "bài", "chương", "phần", "trong", "ở", "thuộc", "những", "học"];
+            
+            for (let i = 0; i < 2; i++) { // Lặp 2 lần để xóa triệt để các từ đứng liền nhau
+                for (let word of stopWordsList) {
+                    const regex = new RegExp(`(?:^|\\s)${word}(?=\\s|$)`, 'gi');
+                    keyword = keyword.replace(regex, " ");
+                }
+            }
+            keyword = keyword.replace(/\s+/g, " ").trim();
+
+            if (!keyword) {
+                return { success: true, question: message, files: [] };
+            }
+
+            // Hàm chuẩn hóa chuỗi tuyệt đối
+            const normalize = (str) => {
+                if (!str) return "";
+                return str.normalize("NFD")
+                    .replace(/[\u0300-\u036f]/g, "") // Xóa dấu tiếng Việt
+                    .replace(/đ/g, "d").replace(/Đ/g, "D") // Sửa lỗi chữ đ
+                    .toLowerCase()
+                    .replace(/[^a-z0-9]/g, ""); // Xóa toàn bộ kí tự đặc biệt, dấu cách, giữ chữ & số
+            };
+
+            // Hàm chuẩn hóa thành mảng từ (chữ và số)
+            const normalizeWords = (str) => {
+                if (!str) return [];
+                return str.normalize("NFD")
+                    .replace(/[\u0300-\u036f]/g, "")
+                    .replace(/đ/g, "d").replace(/Đ/g, "D")
+                    .toLowerCase()
+                    .replace(/[^a-z0-9]/g, " ") // Biến mọi ký tự đặc biệt thành dấu cách
+                    .split(/\s+/) // Cắt theo dấu cách
+                    .filter(w => w.length > 0);
+            };
+
+            const searchKey = normalize(keyword);
+            const queryWords = normalizeWords(keyword);
+
+            if (searchKey.length < 3) {
+                return { success: false, error: `Từ khóa quá ngắn để tìm kiếm tài liệu.`, skipErrorUI: true };
+            }
+
+            // Hàm lấy tên đầy đủ bao gồm toàn bộ thư mục cha.
+            // Dùng Map và chống vòng lặp để hỗ trợ thư mục lồng sâu hơn 3 tầng.
+            const parentMap = workerData.parentMap || {};
+            const fileById = new Map(files.map(file => [file.id, file]));
+            const getFullPathName = (file) => {
+                let name = file.name;
+                let currentId = parentMap[file.id];
+                const visitedIds = new Set();
+                while (currentId && !visitedIds.has(currentId)) {
+                    visitedIds.add(currentId);
+                    const parentFile = fileById.get(currentId);
+                    if (parentFile) {
+                        name = parentFile.name + " " + name;
+                        currentId = parentMap[currentId];
+                    } else {
+                        break;
+                    }
+                }
+                return name;
+            };
+
+            let finalFiles = files.filter(f => {
+                const fullName = getFullPathName(f);
+                const fName = normalize(fullName);
+                const fWords = normalizeWords(fullName);
+
+                if (fName.includes(searchKey)) return true;
+                if (queryWords.length > 0 && queryWords.every(w => fWords.includes(w))) return true;
+                if (fWords.length > 0 && fWords.every(w => queryWords.includes(w))) return true;
+
+                return false;
+            });
+
+            // Nếu từ khóa khớp tên một thư mục, vẫn phải đưa các file bên trong
+            // thư mục đó vào kết quả để hệ thống có thể tải và đọc nội dung.
+            // Trước đây chỉ giữ lại folder nên Gemini không nhận được tài liệu nào.
+            const matchingFolderIds = new Set(
+                finalFiles.filter(file => file.type === 'folder').map(file => file.id)
+            );
+            if (matchingFolderIds.size > 0) {
+                const getAncestorIds = (file) => {
+                    const ancestorIds = [];
+                    const visitedIds = new Set();
+                    let currentId = parentMap[file.id];
+                    while (currentId && !visitedIds.has(currentId)) {
+                        visitedIds.add(currentId);
+                        ancestorIds.push(currentId);
+                        currentId = parentMap[currentId];
+                    }
+                    return ancestorIds;
+                };
+
+                const matchedFiles = finalFiles.filter(file => file.type === 'file');
+                const matchedFileIds = new Set(matchedFiles.map(file => file.id));
+                const filesInsideMatchingFolders = files
+                    .filter(file => file.type === 'file' && !matchedFileIds.has(file.id))
+                    .filter(file => getAncestorIds(file).some(id => matchingFolderIds.has(id)))
+                    .sort((a, b) => a.name.localeCompare(b.name, 'vi'))
+                    .slice(0, 8);
+
+                finalFiles = [
+                    ...finalFiles.filter(file => file.type === 'folder'),
+                    ...matchedFiles,
+                    ...filesInsideMatchingFolders
+                ];
+            }
+
+            if (finalFiles.length === 0) {
+                return { success: false, error: `Hệ thống không tìm thấy tài liệu nào có tên chứa từ khóa: "${keyword}".`, isNotFound: true };
+            }
+
+            // Ưu tiên hiển thị file trước để Gemini có thể đọc nội dung, thư mục để sau
+            finalFiles.sort((a, b) => {
+                if (a.type === 'file' && b.type === 'folder') return -1;
+                if (a.type === 'folder' && b.type === 'file') return 1;
+                return 0;
+            });
+
+            return {
+                success: true,
+                question: message,
+                files: finalFiles
+            };
+        }
+
+        return workerData;
+    } catch (err) {
+        if (err.name === 'AbortError') {
+            console.log("Tìm kiếm tài liệu quá lâu (>4s), chuyển thẳng cho Gemini xử lý.");
+            return { success: true, question: message, files: [] };
+        }
+        return { success: false, error: err.message };
+    }
+}
+
+// Hàm chống XSS khi render text của người dùng
 function escapeHTML(str) {
     return String(str ?? '').replace(/[&<>'"]/g, tag => ({
         '&': '&amp;',
@@ -1344,159 +1498,7 @@ function renderMarkdown(value) {
     const html = window.marked ? marked.parse(String(value ?? '')) : escapeHTML(value);
     return window.DOMPurify
         ? DOMPurify.sanitize(html, { USE_PROFILES: { html: true }, FORBID_TAGS: ['script', 'style', 'iframe', 'object', 'embed'], FORBID_ATTR: ['style', 'onerror', 'onclick', 'onload'] })
-        : escapeHTML(value);
-}
-
-async function fetchDocumentSearch(message) {
-    // Bá»  qua náº¿u tin nháº¯n rá»—ng
-    if (!message || message.trim() === "") {
-        return { success: true, question: message, files: [] };
-    }
-
-    // YÊU CẦU MỚI: Chỉ tìm tài liệu khi người dùng gõ rõ chữ "tìm tài liệu"
-    const lowerMsg = message.toLowerCase();
-    if (!lowerMsg.includes("tÃ¬m tÃ i liá»‡u") && !lowerMsg.includes("tìm tài liệu") && !lowerMsg.includes("tim tai lieu")) {
-        return { success: true, question: message, files: [] };
-    }
-
-    try {
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 45000); // Tối đa 45s cho tìm kiếm tài liệu
-
-        const response = await fetch(WORKER_URL, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({ message: message }),
-            signal: controller.signal
-        });
-        clearTimeout(timeoutId);
-
-        const workerData = await response.json();
-
-        if (workerData.success && workerData.files && workerData.files.length > 0) {
-            const files = workerData.files;
-
-            // Thuáº­t toÃ¡n bÃ³c tÃ¡ch tá»« khÃ³a báº±ng Javascript (Tá»‘c Ä‘á»™: 1ms, khÃ´ng tá»‘n API)
-            let keyword = message.toLowerCase().trim();
-
-            // 1. Xóa các cụm từ mào đầu
-            const prefixes = ["làm ơn", "bạn ơi", "cho mình xin", "cho tôi xin", "tìm giúp", "tìm kiếm", "tìm", "xin", "có", "bạn có", "hãy tìm"];
-            for (let p of prefixes) {
-                if (keyword.startsWith(p)) {
-                    keyword = keyword.substring(p.length).trim();
-                }
-            }
-
-            // 2. Xóa các cụm từ đuôi
-            const suffixes = ["không", "nhé", "nha", "với", "đi", "giúp mình", "giúp tôi", "ạ", "không vậy", "không ạ"];
-            for (let s of suffixes) {
-                if (keyword.endsWith(s)) {
-                    keyword = keyword.substring(0, keyword.length - s.length).trim();
-                }
-            }
-
-            // 3. Xóa các từ chung chung chỉ loại file
-            keyword = keyword.replace(/tài liệu|file|bài tập|đề thi|tóm tắt|lý thuyết|chuyên đề|thư mục|folder|sách|đáp án|hướng dẫn|ôn tập|ôn thi|đề cương|kiểm tra|môn|về|của|cho|các|lớp|khối|bài|chương|phần/gi, "").trim();
-
-            if (!keyword) {
-                return { success: true, question: message, files: [] };
-            }
-
-            // Hàm chuẩn hóa chuỗi tuyệt đối
-            const normalize = (str) => {
-                if (!str) return "";
-                return str.normalize("NFD")
-                    .replace(/[\u0300-\u036f]/g, "") // Xóa dấu tiếng Việt
-                    .replace(/đ/g, "d").replace(/Đ/g, "D") // Sửa lỗi chữ đ
-                    .toLowerCase()
-                    .replace(/[^a-z0-9]/g, ""); // Xóa toàn bộ kí tự đặc biệt, dấu cách, giữ chữ & số
-            };
-
-            // Hàm chuẩn hóa thành mảng từ (chữ và số)
-            const normalizeWords = (str) => {
-                if (!str) return [];
-                return str.normalize("NFD")
-                    .replace(/[\u0300-\u036f]/g, "")
-                    .replace(/đ/g, "d").replace(/Đ/g, "D")
-                    .toLowerCase()
-                    .replace(/[^a-z0-9]/g, " ") // Biến mọi ký tự đặc biệt thành dấu cách
-                    .split(/\s+/) // Cắt theo dấu cách
-                    .filter(w => w.length > 0);
-            };
-
-            const searchKey = normalize(keyword);
-            const queryWords = normalizeWords(keyword);
-
-            if (searchKey.length < 3) {
-                return { success: false, error: `Từ khóa quá ngắn để tìm kiếm tài liệu.`, skipErrorUI: true };
-            }
-
-            // Hàm lấy tên đầy đủ bao gồm thư mục cha
-            const parentMap = workerData.parentMap || {};
-            const getFullPathName = (file) => {
-                let name = file.name;
-                let currentId = parentMap[file.id];
-                let depth = 0;
-                while (currentId && depth < 3) {
-                    const parentFile = files.find(f => f.id === currentId);
-                    if (parentFile) {
-                        name = parentFile.name + " " + name;
-                        currentId = parentMap[currentId];
-                    } else {
-                        break;
-                    }
-                    depth++;
-                }
-                return name;
-            };
-
-            let finalFiles = files.filter(f => {
-                const fullName = getFullPathName(f);
-                const fName = normalize(fullName);
-                const fWords = normalizeWords(fullName);
-
-                if (fName.includes(searchKey)) return true;
-                if (queryWords.length > 0 && queryWords.every(w => fWords.includes(w))) return true;
-                if (fWords.length > 0 && fWords.every(w => queryWords.includes(w))) return true;
-
-                return false;
-            });
-
-            // Nếu tìm thấy thư mục, chỉ trả về thư mục (bỏ qua các file lẻ để đỡ rối mắt)
-            const hasFolder = finalFiles.some(f => f.type === 'folder');
-            if (hasFolder) {
-                finalFiles = finalFiles.filter(f => f.type === 'folder');
-            }
-
-            if (finalFiles.length === 0) {
-                const sampleFiles = files.slice(0, 5).map(f => f.name).join(", ");
-                return { success: false, error: `Hệ thống không tìm thấy tài liệu nào có tên chứa từ khóa: "${keyword}" (chuẩn hóa: ${searchKey}). Đã quét tổng cộng ${files.length} tài liệu từ Google Drive của bạn. Các file hệ thống quét được ví dụ như: [${sampleFiles}]. Vui lòng kiểm tra xem bạn đã copy đúng FOLDER_IDS trên Cloudflare chưa!` };
-            }
-
-            // Ưu tiên hiển thị file trước để Gemini có thể đọc nội dung, thư mục để sau
-            finalFiles.sort((a, b) => {
-                if (a.type === 'file' && b.type === 'folder') return -1;
-                if (a.type === 'folder' && b.type === 'file') return 1;
-                return 0;
-            });
-
-            return {
-                success: true,
-                question: message,
-                files: finalFiles
-            };
-        }
-
-        return workerData;
-    } catch (err) {
-        if (err.name === 'AbortError') {
-            console.log("TÃ¬m kiáº¿m tÃ i liá»‡u quÃ¡ lÃ¢u (>4s), chuyá»ƒn tháº³ng cho Gemini xá»­ lÃ½.");
-            return { success: true, question: message, files: [] };
-        }
-        return { success: false, error: err.message };
-    }
+        : html;
 }
 
 // Gá» i API cá»§a Google Gemini
