@@ -1255,15 +1255,13 @@ async function fetchDocumentSearch(message) {
         directFileId = driveLinkMatch[1];
     }
 
-    // Kích hoạt tìm kiếm khi người dùng có ý định tìm/tra/mở tài liệu.
-    // Trước đây chỉ nhận đúng cụm "tìm tài liệu", khiến các câu như
-    // "tìm chuyên đề rút gọn" hoặc "tra file ..." bị bỏ qua hoàn toàn.
+    // Chỉ kích hoạt tra cứu khi người dùng dùng đúng mẫu:
+    // "Tìm tài liệu + tên thư mục/file". Các câu hỏi bình thường
+    // sẽ được chuyển thẳng cho Gemini, không gọi kho Google Drive.
     const lowerMsg = message.toLowerCase();
-    const searchIntent = /(?:^|\s)(?:tìm|tim|tra|truy\s*cứu|truy\s*cuu|mở|mo|đọc|doc|xem|xin)(?=\s|$)/i.test(lowerMsg);
-    const documentIntent = /(?:^|\s)(?:tài\s*liệu|tai\s*lieu|file|tệp|tep|thư\s*mục|thu\s*muc|folder|chuyên\s*đề|chuyen\s*de|đề\s*thi|de\s*thi|bài\s*tập|bai\s*tap)(?=\s|$)/i.test(lowerMsg);
-    const genericDocumentRequest = /^(?:tài\s*liệu|tai\s*lieu|file|tệp|tep|thư\s*mục|thu\s*muc|folder)[?.!\s]*$/i.test(lowerMsg);
-    const hasDocumentSearchQuery = documentIntent && !genericDocumentRequest;
-    if (!directFileId && !(searchIntent && documentIntent) && !hasDocumentSearchQuery) {
+    const explicitDocumentSearch = /^(?:làm\s*ơn\s+|vui\s*lòng\s+)?tìm\s+tài\s+liệu(?:\s+|[：:])/i.test(lowerMsg)
+        || /^(?:lam\s*on\s+|vui\s*long\s+)?tim\s+tai\s+lieu(?:\s+|[：:])/i.test(lowerMsg);
+    if (!directFileId && !explicitDocumentSearch) {
         return { success: true, question: message, files: [] };
     }
 
@@ -1304,35 +1302,18 @@ async function fetchDocumentSearch(message) {
                 };
             }
 
-            // Thuật toán bóc tách từ khóa bằng Javascript (Tốc độ: 1ms, không tốn API)
-            let keyword = message.toLowerCase().trim();
+            // Với mẫu bắt buộc, lấy nguyên phần sau "Tìm tài liệu" làm từ khóa.
+            // Không xóa "chuyên đề" vì đó có thể là một phần tên thư mục/file.
+            let keyword = message.trim()
+                .replace(/^(?:làm\s*ơn\s+|vui\s*lòng\s+)?tìm\s+tài\s+liệu\s*/i, "")
+                .replace(/^(?:lam\s*on\s+|vui\s*long\s+)?tim\s+tai\s+lieu\s*/i, "")
+                .replace(/^[：:]\s*/, "")
+                .trim();
 
-            // 1. Xóa các cụm từ mào đầu
-            const prefixes = ["làm ơn", "bạn ơi", "cho mình xin", "cho tôi xin", "tìm giúp", "tìm kiếm", "truy cứu", "truy cuu", "tìm", "tra", "xin", "có", "bạn có", "hãy tìm", "mở", "đọc", "xem"];
-            for (let p of prefixes) {
-                if (keyword.startsWith(p)) {
-                    keyword = keyword.substring(p.length).trim();
-                }
-            }
-
-            // 2. Xóa các cụm từ đuôi
-            const suffixes = ["không", "nhé", "nha", "với", "đi", "giúp mình", "giúp tôi", "ạ", "không vậy", "không ạ"];
-            for (let s of suffixes) {
-                if (keyword.endsWith(s)) {
-                    keyword = keyword.substring(0, keyword.length - s.length).trim();
-                }
-            }
-
-            // 3. Xóa các từ chung chung chỉ loại file (sử dụng regex với khoảng trắng để tránh xóa nhầm trong từ)
-            const stopWordsList = ["tài liệu", "file", "bài tập", "đề thi", "tóm tắt", "lý thuyết", "thư mục con", "thư mục", "folder", "sách", "đáp án", "hướng dẫn", "ôn tập", "ôn thi", "đề cương", "kiểm tra", "nằm trong", "bên trong", "vị trí", "có tên", "nằm", "bên", "tên", "được", "đặt", "con", "môn", "về", "của", "cho", "các", "lớp", "khối", "bài", "chương", "phần", "trong", "ở", "thuộc", "những", "học"];
-            
-            for (let i = 0; i < 2; i++) { // Lặp 2 lần để xóa triệt để các từ đứng liền nhau
-                for (let word of stopWordsList) {
-                    const regex = new RegExp(`(?:^|\\s)${word}(?=\\s|$)`, 'gi');
-                    keyword = keyword.replace(regex, " ");
-                }
-            }
-            keyword = keyword.replace(/\s+/g, " ").trim();
+            keyword = keyword
+                .replace(/\s+/g, " ")
+                .replace(/[?.!]+$/, "")
+                .trim();
 
             if (!keyword) {
                 return { success: true, question: message, files: [] };
