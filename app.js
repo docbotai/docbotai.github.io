@@ -2002,22 +2002,33 @@ const mobileMenuBtn = document.getElementById('mobileMenuBtn');
 const sidebarOverlay = document.getElementById('sidebarOverlay');
 
 if (mobileMenuBtn && sidebar && sidebarOverlay) {
-    mobileMenuBtn.addEventListener('click', (e) => {
-        e.stopPropagation();
-        sidebar.classList.toggle('mobile-open');
-        sidebarOverlay.classList.toggle('active');
+    const setMobileSidebarOpen = (shouldOpen) => {
+        sidebar.classList.toggle('mobile-open', shouldOpen);
+        sidebarOverlay.classList.toggle('active', shouldOpen);
+        mobileMenuBtn.setAttribute('aria-expanded', String(shouldOpen));
+    };
+
+    const toggleMobileSidebar = (event) => {
+        event?.preventDefault();
+        event?.stopPropagation();
+        setMobileSidebarOpen(!sidebar.classList.contains('mobile-open'));
+    };
+
+    // Hỗ trợ chuột trái, chạm, bàn phím và cả chuột phải theo yêu cầu.
+    mobileMenuBtn.addEventListener('click', toggleMobileSidebar);
+    mobileMenuBtn.addEventListener('contextmenu', toggleMobileSidebar);
+    mobileMenuBtn.addEventListener('keydown', (event) => {
+        if (event.key === 'Enter' || event.key === ' ') toggleMobileSidebar(event);
     });
 
     sidebarOverlay.addEventListener('click', () => {
-        sidebar.classList.remove('mobile-open');
-        sidebarOverlay.classList.remove('active');
+        setMobileSidebarOpen(false);
     });
 
     const closeSidebarBtn = document.getElementById('closeSidebarBtn');
     if (closeSidebarBtn) {
         closeSidebarBtn.addEventListener('click', () => {
-            sidebar.classList.remove('mobile-open');
-            sidebarOverlay.classList.remove('active');
+            setMobileSidebarOpen(false);
         });
     }
 }
