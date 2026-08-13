@@ -1356,11 +1356,7 @@ body.dark-mode .chat-options-btn:hover {
     display: block;
 }
 
-@media (hover: hover) {
-    .has-submenu:hover>.sub-menu {
-        display: block;
-    }
-}
+/* Submenu chỉ mở khi người dùng nhấp/chạm vào mục cha (.active), không mở khi rê chuột. */
 
 .sub-menu>li {
     display: flex;
@@ -1415,6 +1411,7 @@ body.dark-mode .chat-options-btn:hover {
     margin-right: 12px;
     user-select: none;
     -webkit-tap-highlight-color: transparent;
+    touch-action: manipulation;
 }
 
 .sidebar-overlay {
