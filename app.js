@@ -1753,6 +1753,12 @@ function activateSettingsItem(item, handler) {
 
 // Ä á» c cÃ i Ä‘áº·t
 function loadSettings() {
+    // The Document Workspace has a new dark executive default. Migrate the former
+    // Gemini-like light default once, then continue honoring the user's own choice.
+    if (!localStorage.getItem('docbotWorkspaceThemeV1')) {
+        localStorage.setItem('theme', 'dark');
+        localStorage.setItem('docbotWorkspaceThemeV1', 'true');
+    }
     const savedTheme = localStorage.getItem('theme') || 'dark';
     const savedGradient = localStorage.getItem('gradient') || 'default';
 
