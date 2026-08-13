@@ -1737,6 +1737,13 @@ const closeAccountBtn = document.getElementById('closeAccountBtn');
 const settingsBtn = document.getElementById('settingsBtn');
 const settingsDropdown = document.getElementById('settingsDropdown');
 const logoutBtn = document.getElementById('logoutBtn');
+
+// The mobile sidebar is transformed while it opens. A fixed element inside a
+// transformed parent is still clipped by that parent, so keep Settings at the
+// document level and let it behave as a true viewport panel.
+if (settingsDropdown && settingsDropdown.parentElement !== document.body) {
+    document.body.appendChild(settingsDropdown);
+}
 const activityMenuItem = document.getElementById('activityMenuItem');
 const personalIntelligenceMenuItem = document.getElementById('personalIntelligenceMenuItem');
 
