@@ -175,7 +175,8 @@ document.addEventListener('DOMContentLoaded', () => {
     // Show cached history first instead of waiting for the Supabase session request.
     loadChatHistory(null);
 
-    supabaseClient.auth.onAuthStateChange((_event, user) => {
+    supabaseClient.auth.onAuthStateChange((_event, session) => {
+        const user = session?.user || null;
         if (user) {
             if (currentUser?.id !== user.id) handleUserLogin(user);
         } else {
@@ -1752,7 +1753,7 @@ function activateSettingsItem(item, handler) {
 
 // Ä á» c cÃ i Ä‘áº·t
 function loadSettings() {
-    const savedTheme = localStorage.getItem('theme') || 'light';
+    const savedTheme = localStorage.getItem('theme') || 'dark';
     const savedGradient = localStorage.getItem('gradient') || 'default';
 
     applyTheme(savedTheme);
@@ -2326,4 +2327,71 @@ if (!localStorage.getItem('hasSeenGuide')) {
     setTimeout(openGuide, 1000); // M? sau 1 giây khi m?i t?i trang
     localStorage.setItem('hasSeenGuide', 'true');
 }
+
+// Document Workspace interactions: lightweight controls that keep the existing chat flow intact.
+const documentStudio = document.querySelector('.document-studio');
+const documentPaneToggle = document.getElementById('documentPaneToggle');
+const documentSearchBtn = document.getElementById('documentSearchBtn');
+const commandPalette = document.getElementById('commandPalette');
+const commandTrigger = document.getElementById('commandTrigger');
+const commandInput = document.getElementById('commandInput');
+
+function setDocumentPaneCollapsed(collapsed) {
+    if (!documentStudio) return;
+    documentStudio.classList.toggle('document-collapsed', collapsed);
+    localStorage.setItem('documentPaneCollapsed', String(collapsed));
+}
+
+if (documentStudio && localStorage.getItem('documentPaneCollapsed') === 'true') {
+    setDocumentPaneCollapsed(true);
+}
+
+documentPaneToggle?.addEventListener('click', () => {
+    setDocumentPaneCollapsed(!documentStudio?.classList.contains('document-collapsed'));
+});
+
+documentSearchBtn?.addEventListener('click', () => {
+    if (!messageInput) return;
+    messageInput.value = 'Tìm tài liệu: ';
+    messageInput.focus();
+});
+
+function openCommandPalette() {
+    if (!commandPalette) return;
+    commandPalette.classList.add('active');
+    commandPalette.setAttribute('aria-hidden', 'false');
+    window.setTimeout(() => commandInput?.focus(), 0);
+}
+
+function closeCommandPalette() {
+    if (!commandPalette) return;
+    commandPalette.classList.remove('active');
+    commandPalette.setAttribute('aria-hidden', 'true');
+}
+
+commandTrigger?.addEventListener('click', openCommandPalette);
+commandPalette?.addEventListener('click', (event) => {
+    if (event.target === commandPalette) closeCommandPalette();
+});
+
+document.querySelectorAll('.command-options [data-command]').forEach((button) => {
+    button.addEventListener('click', () => {
+        if (messageInput) {
+            messageInput.value = button.dataset.command || '';
+            messageInput.focus();
+        }
+        closeCommandPalette();
+    });
+});
+
+document.addEventListener('keydown', (event) => {
+    if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'k') {
+        event.preventDefault();
+        if (commandPalette?.classList.contains('active')) closeCommandPalette();
+        else openCommandPalette();
+    }
+    if (event.key === 'Escape' && commandPalette?.classList.contains('active')) {
+        closeCommandPalette();
+    }
+});
 
