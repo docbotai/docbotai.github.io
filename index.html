@@ -8,11 +8,11 @@
     <!-- Thêm Google Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700&family=Source+Serif+4:opsz,wght@8..60,500;8..60,600;8..60,700&display=swap" rel="stylesheet">
 
     <!-- KaTeX phải có CSS trước khi nội dung AI render công thức, nếu không phân số/số mũ sẽ chồng lên nhau. -->
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.css">
-    <link rel="stylesheet" href="style.css?v=14">
+    <link rel="stylesheet" href="style.css?v=15">
     <!-- Thêm Favicon -->
     <link rel="icon" type="image/png" href="logo.png">
 </head>
@@ -279,8 +279,13 @@
                     </svg>
                 </button>
                 <div class="logo-area" onclick="location.reload();" style="cursor: pointer;" title="Tải lại trang">
-                    <img src="logo.png" alt="DocBot Logo" style="height: 32px; margin-right: 4px;">
-                    <span class="logo-text">DocBot</span>
+                    <span class="docbot-mark" aria-hidden="true">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7">
+                            <path d="M6 3.5h8l4 4V20a.5.5 0 0 1-.5.5h-11A.5.5 0 0 1 6 20V3.5Z"></path>
+                            <path d="M14 3.5V8h4M9 12h6M9 15.5h4.5"></path>
+                        </svg>
+                    </span>
+                    <span class="logo-text">DocBot<span class="logo-suffix"> / workspace</span></span>
                 </div>
                 <div class="nav-actions">
                     <select id="modelSelect" class="model-select">
@@ -308,6 +313,39 @@
                 </div>
             </header>
 
+            <section class="document-studio" aria-label="Không gian làm việc tài liệu">
+                <aside class="document-pane" id="documentPane">
+                    <div class="pane-header">
+                        <div>
+                            <span class="eyebrow">DOCUMENT DESK</span>
+                            <h2>Tài liệu làm việc</h2>
+                        </div>
+                        <button class="pane-icon-btn" id="documentPaneToggle" aria-label="Thu gọn khu vực tài liệu" title="Thu gọn khu vực tài liệu">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="m14 6-6 6 6 6"></path></svg>
+                        </button>
+                    </div>
+                    <div class="document-empty-state">
+                        <div class="document-emblem" aria-hidden="true">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M6 3.5h8l4 4V20a.5.5 0 0 1-.5.5h-11A.5.5 0 0 1 6 20V3.5Z"></path><path d="M14 3.5V8h4M9 12h6M9 15.5h5"></path></svg>
+                        </div>
+                        <h3>Đặt tài liệu vào bàn đọc</h3>
+                        <p>Tìm một tài liệu trong kho Drive, hoặc gửi đường dẫn Google Drive để DocBot đọc và phân tích.</p>
+                        <button class="document-search-btn" id="documentSearchBtn">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="11" cy="11" r="6"></circle><path d="m16 16 4 4"></path></svg>
+                            Tìm trong thư viện
+                        </button>
+                    </div>
+                    <div class="reading-status" aria-label="Trạng thái đọc tài liệu">
+                        <span class="status-dot"></span>
+                        <span>Sẵn sàng phân tích nguồn</span>
+                    </div>
+                </aside>
+
+                <section class="copilot-pane" aria-label="DocBot Copilot">
+                    <div class="copilot-header">
+                        <div><span class="eyebrow">DOCBOT COPILOT</span><span class="copilot-title">Phân tích có căn cứ</span></div>
+                        <button class="command-trigger" id="commandTrigger" title="Lệnh nhanh (Ctrl + K)"><kbd>Ctrl</kbd><kbd>K</kbd><span>Lệnh</span></button>
+                    </div>
             <div class="chat-wrapper" id="chatWrapper">
                 <div class="chat-container" id="chatContainer">
                     <div class="welcome-screen" id="welcomeScreen">
@@ -366,6 +404,8 @@
                     </div>
                 </div>
             </div>
+                </section>
+            </section>
         </main>
     </div>
 
@@ -507,12 +547,25 @@
         </div>
     </div>
 
+    <div class="command-palette" id="commandPalette" aria-hidden="true">
+        <div class="command-dialog" role="dialog" aria-modal="true" aria-label="Lệnh nhanh">
+            <div class="command-input-row"><span>⌘</span><input id="commandInput" type="text" placeholder="Tìm lệnh: tóm tắt, so sánh, tạo quiz..." autocomplete="off"></div>
+            <div class="command-options">
+                <button data-command="Tóm tắt tài liệu này theo các ý chính."><span>01</span>Tóm tắt tài liệu</button>
+                <button data-command="Tạo flashcard ôn tập từ tài liệu này."><span>02</span>Tạo flashcard</button>
+                <button data-command="Lập bảng so sánh các tài liệu đang tìm được."><span>03</span>So sánh tài liệu</button>
+                <button data-command="Tạo sơ đồ tư duy từ nội dung tài liệu."><span>04</span>Tạo mindmap</button>
+            </div>
+            <p><kbd>Esc</kbd> để đóng <span>•</span> Chọn một tác vụ để bắt đầu</p>
+        </div>
+    </div>
+
     <!-- Scripts -->
     <script defer src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script defer src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
     <script defer src="https://cdnjs.cloudflare.com/ajax/libs/dompurify/3.0.6/purify.min.js"></script>
     <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.js"></script>
-    <script defer src="app.js?v=43"></script>
+    <script defer src="app.js?v=44"></script>
 </body>
 
 </html>
