@@ -12,7 +12,7 @@
 
     <!-- KaTeX phải có CSS trước khi nội dung AI render công thức, nếu không phân số/số mũ sẽ chồng lên nhau. -->
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.css">
-    <link rel="stylesheet" href="style.css?v=18">
+    <link rel="stylesheet" href="style.css?v=19">
     <!-- Thêm Favicon -->
     <link rel="icon" type="image/png" href="logo.png">
 </head>
@@ -344,7 +344,10 @@
                 <section class="copilot-pane" aria-label="DocBot AI">
                     <div class="copilot-header">
                         <div><span class="eyebrow">DOCBOT AI</span><span class="copilot-title">Phân tích có căn cứ</span></div>
-                        <button class="command-trigger" id="commandTrigger" title="Lệnh nhanh (Ctrl + K)"><kbd>Ctrl</kbd><kbd>K</kbd><span>Lệnh</span></button>
+                        <button class="command-trigger" id="commandTrigger" aria-label="Mở lệnh nhanh" title="Lệnh nhanh — Ctrl + K trên máy tính">
+                            <svg class="command-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M13 2 3.7 13.2h6.6L9.8 22 20.3 9.7h-6.5L13 2Z"></path></svg>
+                            <span class="command-label">Lệnh</span><kbd>Ctrl</kbd><kbd>K</kbd>
+                        </button>
                     </div>
             <div class="chat-wrapper" id="chatWrapper">
                 <div class="chat-container" id="chatContainer">
@@ -543,7 +546,18 @@
                     <line x1="6" y1="6" x2="18" y2="18"></line>
                 </svg>
             </button>
-            <img src="huong-dan.png" alt="Hướng dẫn sử dụng DocBot" class="guide-image">
+            <div class="guide-workspace">
+                <span class="eyebrow">DOCBOT AI / HƯỚNG DẪN</span>
+                <h2>Bắt đầu trong vài giây</h2>
+                <p class="guide-intro">DocBot AI là không gian đọc và phân tích tài liệu. Hãy chọn một tác vụ để bắt đầu.</p>
+                <div class="guide-steps">
+                    <article class="guide-step"><span class="guide-number">01</span><div><h3>Tìm tài liệu</h3><p>Nhập <strong>“Tìm tài liệu: tên file hoặc thư mục”</strong>, hoặc dán liên kết Google Drive vào ô chat.</p></div></article>
+                    <article class="guide-step"><span class="guide-number">02</span><div><h3>Hỏi DocBot AI</h3><p>Yêu cầu giải bài, tóm tắt, phân tích hoặc đối chiếu nội dung tài liệu đã tìm được.</p></div></article>
+                    <article class="guide-step"><span class="guide-number">03</span><div><h3>Dùng lệnh nhanh</h3><p><strong>Máy tính:</strong> nhấn <kbd>Ctrl</kbd> + <kbd>K</kbd>. <strong>Điện thoại:</strong> chạm nút <span class="guide-command-chip">⚡ Lệnh</span> ở đầu khung DocBot AI.</p></div></article>
+                    <article class="guide-step"><span class="guide-number">04</span><div><h3>Quản lý cuộc trò chuyện</h3><p>Dùng <strong>+ Cuộc trò chuyện mới</strong>, ô tìm kiếm và mục <strong>Gần đây</strong> ở menu bên trái.</p></div></article>
+                </div>
+                <div class="guide-note"><span>◈</span> DocBot AI có thể mắc lỗi. Với thông tin quan trọng, hãy kiểm tra lại nguồn gốc tài liệu.</div>
+            </div>
         </div>
     </div>
 
