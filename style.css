@@ -2168,3 +2168,37 @@ kbd { border: 1px solid var(--line); background: var(--surface-2); border-radius
 @media (prefers-reduced-motion: reduce) {
     *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; scroll-behavior: auto !important; transition-duration: .01ms !important; }
 }
+
+/* Keep the settings panel inside the compact workspace sidebar. */
+.sidebar .settings-dropdown {
+    width: 220px;
+    min-width: 0;
+    max-height: min(66dvh, 480px);
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    z-index: 4000;
+}
+
+.sidebar .settings-menu > li {
+    flex-wrap: wrap;
+    gap: 10px;
+    padding: 10px 12px;
+    font-size: 13px;
+}
+
+.sidebar .sub-menu {
+    position: static;
+    width: 100%;
+    margin: 8px 0 0;
+    padding: 4px 0;
+    border: 0;
+    border-radius: 4px;
+    background: var(--surface-2);
+    box-shadow: none;
+}
+
+.sidebar .sub-menu > li { padding: 9px 12px; font-size: 12px; }
+
+@media (max-width: 768px) {
+    .sidebar .settings-dropdown { width: min(280px, calc(100vw - 48px)); }
+}
