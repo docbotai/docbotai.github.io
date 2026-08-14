@@ -972,7 +972,7 @@ function appendUserMessage(text, animate = true, imageBase64 = null) {
 
     // Bọc nội dung tin nhắn và thanh công cụ
     div.innerHTML = `
-        <div style="display: flex; flex-direction: column; align-items: flex-end;">
+        <div class="user-message-frame">
             <div class="bubble-content">${htmlContent}</div>
             <div class="user-action-bar" style="display: flex; gap: 8px; justify-content: flex-end; margin-top: 6px; opacity: 0; transition: opacity 0.2s;">
                 <button class="copy-btn" title="Copy tin nhắn" style="color: #10a37f; cursor: pointer; padding: 6px; border: none; background: rgba(16, 163, 127, 0.1); border-radius: 50%; display: flex; align-items: center; justify-content: center;">
@@ -1757,6 +1757,9 @@ async function fetchGeminiResponse(message, documentText, files, previousMessage
                         errorMsg = data.error.message;
                         if (errorMsg.includes("Quota exceeded") || errorMsg.includes("429") || errorMsg.toLowerCase().includes("quota")) {
                             throw new Error(`API Key trên máy chủ đã vượt quá giới hạn lượt hỏi. Vui lòng đợi khoảng 1 phút rồi thử lại nhé!`);
+                        }
+                        if (/user location is not supported for the api use|vị trí người dùng không được hỗ trợ/i.test(errorMsg)) {
+                            throw new Error('Gemini đang từ chối vị trí của máy chủ xử lý. Đây không phải lỗi do câu hỏi hay tài liệu. DocBot cần chuyển proxy AI sang máy chủ có IP được Gemini hỗ trợ.');
                         }
                     } else if (data.error) {
                         errorMsg = typeof data.error === 'string' ? data.error : JSON.stringify(data.error);
