@@ -1588,19 +1588,59 @@ function createMindmapHtml(value, fallbackTitle = 'Sơ đồ tư duy') {
 
     const branches = (roots.length ? roots : [{ label: 'Nội dung chính', children: [{ label: cleanMindmapLabel(value).slice(0, 180) || 'Chưa nhận được nội dung sơ đồ.' }] }])
         .slice(0, 7);
-    const renderChildren = (items, depth = 0) => {
-        if (!items?.length || depth > 2) return '';
-        return `<ul>${items.slice(0, 6).map(item => `<li>${escapeHTML(item.label)}${renderChildren(item.children, depth + 1)}</li>`).join('')}</ul>`;
+    const wrapLabel = (label, maxChars) => {
+        const words = String(label || '').split(/\s+/);
+        const output = [];
+        let line = '';
+        for (const word of words) {
+            const next = line ? `${line} ${word}` : word;
+            if (next.length > maxChars && line) {
+                output.push(line);
+                line = word;
+            } else line = next;
+        }
+        if (line) output.push(line);
+        return output.slice(0, 3);
     };
+    const branchLabels = (items, depth = 0) => {
+        if (!items?.length || depth > 2) return [];
+        return items.slice(0, 6).flatMap(item => [item.label, ...branchLabels(item.children, depth + 1)]);
+    };
+    const textSvg = (lines, x, y, className, lineHeight = 17) =>
+        `<text class="${className}" x="${x}" y="${y}">${lines.map((line, index) => `<tspan x="${x}" dy="${index ? lineHeight : 0}">${escapeHTML(line)}</tspan>`).join('')}</text>`;
+
+    let cursorY = 44;
+    const cards = branches.map(branch => {
+        const titleLines = wrapLabel(branch.label, 36);
+        const detailLines = branchLabels(branch.children).flatMap(label => wrapLabel(`• ${label}`, 52)).slice(0, 7);
+        const height = Math.max(82, 27 + titleLines.length * 18 + detailLines.length * 15 + 15);
+        const y = cursorY;
+        cursorY += height + 20;
+        return { y, height, titleLines, detailLines };
+    });
+    const canvasHeight = Math.max(350, cursorY + 28);
+    const rootLines = wrapLabel(root, 28);
+    const rootHeight = Math.max(86, 44 + rootLines.length * 19);
+    const rootY = Math.round((canvasHeight - rootHeight) / 2);
+    const rootCenterY = rootY + rootHeight / 2;
+    const cardMarkup = cards.map(card => {
+        const centerY = card.y + card.height / 2;
+        return `<path class="mindmap-line" d="M 280 ${rootCenterY} H 340 V ${centerY} H 415" />
+            <rect class="mindmap-svg-branch" x="415" y="${card.y}" width="650" height="${card.height}" rx="12" />
+            ${textSvg(card.titleLines, 438, card.y + 26, 'mindmap-svg-title', 18)}
+            ${textSvg(card.detailLines, 438, card.y + 26 + card.titleLines.length * 18 + 14, 'mindmap-svg-detail', 15)}`;
+    }).join('');
+    const svg = `<svg class="mindmap-image" viewBox="0 0 1120 ${canvasHeight}" role="img" aria-label="Sơ đồ tư duy: ${escapeHTML(root)}" xmlns="http://www.w3.org/2000/svg">
+        <rect class="mindmap-svg-bg" x="1" y="1" width="1118" height="${canvasHeight - 2}" rx="16" />
+        ${cardMarkup}
+        <rect class="mindmap-svg-root" x="48" y="${rootY}" width="232" height="${rootHeight}" rx="14" />
+        <text class="mindmap-svg-kicker" x="70" y="${rootY + 25}">CHỦ ĐỀ TRUNG TÂM</text>
+        ${textSvg(rootLines, 70, rootY + 52, 'mindmap-svg-root-text', 19)}
+    </svg>`;
 
     return `<section class="mindmap-card" aria-label="Sơ đồ tư duy trực quan">
-        <div class="mindmap-card-header"><span class="mindmap-kicker">DOCBOT AI · MINDMAP</span><span class="mindmap-hint">Vuốt ngang để xem toàn bộ sơ đồ</span></div>
-        <div class="mindmap-scroll" tabindex="0">
-            <div class="mindmap-stage">
-                <div class="mindmap-root"><span>Chủ đề</span><strong>${escapeHTML(root)}</strong></div>
-                <div class="mindmap-branches">${branches.map(branch => `<article class="mindmap-branch"><h4>${escapeHTML(branch.label)}</h4>${renderChildren(branch.children)}</article>`).join('')}</div>
-            </div>
-        </div>
+        <div class="mindmap-card-header"><span class="mindmap-kicker">DOCBOT AI · MINDMAP</span><span class="mindmap-hint">Sơ đồ tự co vừa màn hình</span></div>
+        <div class="mindmap-image-wrap">${svg}</div>
     </section>`;
 }
 
