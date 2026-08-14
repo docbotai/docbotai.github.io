@@ -924,6 +924,46 @@ body.dark-mode .chat-options-btn:hover {
 .mindmap-source summary { cursor: pointer; color: var(--gold); font-size: 12px; font-weight: 700; }
 .mindmap-source > :not(summary) { margin-top: 12px; }
 
+.generated-image-card {
+    margin: 4px 0 18px;
+    overflow: hidden;
+    border: 1px solid var(--line);
+    border-radius: 9px;
+    background: var(--surface);
+    box-shadow: 0 14px 32px rgba(18, 15, 8, .08);
+}
+.generated-image-header,
+.generated-image-actions {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 10px 13px;
+    color: var(--muted-ink);
+    font-size: 10px;
+    font-weight: 800;
+    letter-spacing: .1em;
+    text-transform: uppercase;
+    background: var(--surface-2);
+}
+.generated-image-header span:first-child { color: var(--gold); }
+.generated-image {
+    display: block;
+    width: 100%;
+    height: auto;
+    max-height: min(72vh, 720px);
+    object-fit: contain;
+    background: var(--canvas);
+}
+.generated-image-actions { justify-content: flex-end; border-top: 1px solid var(--line); }
+.generated-image-actions a {
+    color: var(--gold);
+    font-size: 11px;
+    text-decoration: none;
+}
+.generated-image-actions a:hover { text-decoration: underline; }
+.generated-image-history { color: var(--muted-ink); font-size: 13px; }
+
 @media (max-width: 768px) {
     .markdown-body table { margin: 14px 0; }
     .markdown-body th,
