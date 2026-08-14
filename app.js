@@ -642,6 +642,7 @@ async function sendMessage() {
     const message = messageInput.value.trim();
     if (message === "" && !attachedImageData) return;
     if (isSendingMessage) return;
+    const isImageTask = isImageGenerationRequest(message);
 
     isSendingMessage = true;
     const sendButton = document.getElementById('searchBtn');
@@ -717,7 +718,7 @@ async function sendMessage() {
         let foundFiles = [];
         let workerHtml = "";
 
-        try {
+        if (!isImageTask) try {
             const workerData = await fetchDocumentSearch(message);
             if (workerData.success && workerData.files && workerData.files.length > 0) {
                 foundFiles = workerData.files;
@@ -816,6 +817,15 @@ async function sendMessage() {
         const streamRenderer = createStreamingRenderer(responseEl);
 
         try {
+            if (isImageTask) {
+                const generatedImage = await fetchGeminiImage(message, currentAttachedImageData);
+                streamRenderer.cancel();
+                const imageHtml = createGeneratedImageHtml(generatedImage, message);
+                responseEl.classList.remove('streaming-response');
+                responseEl.innerHTML = imageHtml;
+                // Ảnh base64 rất lớn, chỉ giữ hướng dẫn tải ảnh trong lịch sử chat.
+                finalHtml += `<div class="markdown-body" style="margin-top: 15px;">${createGeneratedImageHistoryHtml()}</div>`;
+            } else {
             if (currentAttachedImageData) {
                 foundFiles.push(currentAttachedImageData);
             }
@@ -830,6 +840,7 @@ async function sendMessage() {
             responseEl.classList.remove('streaming-response');
             responseEl.innerHTML = responseHtml;
             finalHtml += `<div class="markdown-body" style="margin-top: 15px;">${responseHtml}</div>`;
+            }
         } catch (e) {
             streamRenderer.cancel();
             console.error("Lỗi Gemini:", e);
@@ -1554,6 +1565,73 @@ function renderMarkdown(value) {
 
 function isMindmapRequest(message) {
     return /^\s*tạo\s+(?:mindmap|sơ\s+đồ\s+tư\s+duy)/i.test(String(message || ''));
+}
+
+function isImageGenerationRequest(message) {
+    return /^\s*(?:\/image|\/tạo-?ảnh|tạo\s+(?:một\s+)?(?:ảnh|hình)|vẽ\s+(?:một\s+)?(?:ảnh|hình))/i.test(String(message || ''));
+}
+
+function imagePromptFromMessage(message) {
+    return String(message || '')
+        .replace(/^\s*(?:\/image|\/tạo-?ảnh|tạo\s+(?:một\s+)?(?:ảnh|hình)|vẽ\s+(?:một\s+)?(?:ảnh|hình))\s*:?[\s-]*/i, '')
+        .trim();
+}
+
+async function fetchGeminiImage(message, sourceImage = null) {
+    const prompt = imagePromptFromMessage(message);
+    if (!prompt) throw new Error('Hãy mô tả ảnh cần tạo. Ví dụ: “Tạo ảnh: thư viện cổ điển, ánh sáng vàng, phong cách điện ảnh”.');
+
+    const parts = [{
+        text: `Tạo một hình ảnh hoàn chỉnh theo yêu cầu sau. Không chèn chữ vào ảnh trừ khi người dùng yêu cầu rõ ràng: ${prompt}`
+    }];
+    if (sourceImage?.inlineData?.mimeType?.startsWith('image/') && sourceImage.inlineData.data) {
+        parts.push({ inlineData: sourceImage.inlineData });
+    }
+
+    const response = await fetch(
+        `${WORKER_URL}gemini-proxy?path=${encodeURIComponent('/v1beta/models/gemini-3.1-flash-lite-image:generateContent')}`,
+        {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                contents: [{ role: 'user', parts }],
+                generationConfig: { responseModalities: ['IMAGE', 'TEXT'] }
+            })
+        }
+    );
+
+    let data = null;
+    try { data = await response.json(); } catch (_) { }
+    if (!response.ok) {
+        const detail = data?.error?.message || data?.error || `Lỗi tạo ảnh (HTTP ${response.status})`;
+        throw new Error(typeof detail === 'string' ? detail : JSON.stringify(detail));
+    }
+
+    const responseParts = data?.candidates?.[0]?.content?.parts || [];
+    const imagePart = responseParts.find(part => /^image\/(?:png|jpe?g|webp)$/i.test(part?.inlineData?.mimeType || '') && part.inlineData.data);
+    if (!imagePart) {
+        const explanation = responseParts.map(part => part.text).filter(Boolean).join(' ').trim();
+        throw new Error(explanation || 'Gemini chưa trả về ảnh. Hãy thử mô tả ngắn hơn.');
+    }
+    return {
+        dataUrl: `data:${imagePart.inlineData.mimeType};base64,${imagePart.inlineData.data}`,
+        mimeType: imagePart.inlineData.mimeType
+    };
+}
+
+function createGeneratedImageHtml(image, originalPrompt) {
+    const safeImage = safeDataImageUrl(image?.dataUrl);
+    if (!safeImage) throw new Error('Dữ liệu ảnh Gemini trả về không hợp lệ.');
+    const extension = image.mimeType === 'image/webp' ? 'webp' : image.mimeType === 'image/jpeg' ? 'jpg' : 'png';
+    return `<section class="generated-image-card" aria-label="Ảnh được tạo bởi DocBot AI">
+        <div class="generated-image-header"><span>DOCBOT AI · TẠO ẢNH</span><span>AI generated</span></div>
+        <img class="generated-image" src="${escapeHTML(safeImage)}" alt="${escapeHTML(imagePromptFromMessage(originalPrompt) || 'Ảnh do DocBot AI tạo')}" />
+        <div class="generated-image-actions"><a href="${escapeHTML(safeImage)}" download="docbot-ai-${Date.now()}.${extension}">Tải ảnh</a></div>
+    </section>`;
+}
+
+function createGeneratedImageHistoryHtml() {
+    return `<div class="generated-image-history">Đã tạo ảnh. Ảnh chỉ hiển thị trong phiên hiện tại; hãy bấm <strong>Tải ảnh</strong> để lưu.</div>`;
 }
 
 function cleanMindmapLabel(value) {
