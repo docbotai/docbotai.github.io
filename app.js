@@ -1561,8 +1561,8 @@ async function fetchGeminiResponse(message, documentText, files, previousMessage
         },
         contents: [],
         generationConfig: {
-            temperature: 0.7,
-            maxOutputTokens: 8192,
+            temperature: 0.35,
+            maxOutputTokens: 2048,
         }
     };
 
@@ -1649,6 +1649,10 @@ async function fetchGeminiResponse(message, documentText, files, previousMessage
                 },
                 body: JSON.stringify(requestBody)
             });
+
+            if (response.status === 524) {
+                throw new Error('Gemini mất quá lâu để xử lý tài liệu này. Hãy thử lại sau ít phút, hoặc dùng file PDF nhỏ hơn / yêu cầu theo một phần cụ thể của tài liệu.');
+            }
 
             if (!response.ok) {
                 let errorMsg = `Lỗi kết nối API (HTTP ${response.status})`;
