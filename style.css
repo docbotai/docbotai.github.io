@@ -831,6 +831,57 @@ body.dark-mode .chat-options-btn:hover {
     line-height: 1.75;
 }
 
+/* Bảng do DocBot tạo: phân tách rõ hàng/cột, không ép chữ quá hẹp trên mobile. */
+.markdown-body table {
+    display: block;
+    width: max-content;
+    min-width: max(100%, 620px);
+    max-width: 100%;
+    margin: 16px 0;
+    overflow-x: auto;
+    overflow-y: hidden;
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    border-collapse: separate;
+    border-spacing: 0;
+    background: var(--surface);
+    -webkit-overflow-scrolling: touch;
+}
+
+.markdown-body th,
+.markdown-body td {
+    min-width: 180px;
+    padding: 11px 13px;
+    vertical-align: top;
+    text-align: left;
+    border-right: 1px solid var(--line);
+    border-bottom: 1px solid var(--line);
+    overflow-wrap: normal;
+    word-break: normal;
+}
+
+.markdown-body th {
+    color: var(--ink);
+    font-weight: 700;
+    background: var(--surface-2);
+}
+
+.markdown-body th:first-child,
+.markdown-body td:first-child {
+    min-width: 108px;
+    font-weight: 650;
+}
+
+.markdown-body th:last-child,
+.markdown-body td:last-child { border-right: 0; }
+.markdown-body tr:last-child td { border-bottom: 0; }
+
+@media (max-width: 768px) {
+    .markdown-body table { margin: 14px 0; }
+    .markdown-body th,
+    .markdown-body td { padding: 10px 12px; }
+}
+
 /* Giữ một công thức inline thành một khối nguyên vẹn, tránh vỡ/chồng ký tự. */
 .markdown-body .katex {
     display: inline-block;
