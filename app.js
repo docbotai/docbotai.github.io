@@ -824,9 +824,12 @@ async function sendMessage() {
             });
             streamRenderer.cancel();
             const renderedAiHtml = renderMarkdown(aiText);
+            const responseHtml = isMindmapRequest(message)
+                ? `${createMindmapHtml(aiText, message.replace(/^\s*tạo\s+(?:mindmap|sơ\s+đồ\s+tư\s+duy)\s*:?\s*/i, ''))}<details class="mindmap-source"><summary>Xem nội dung sơ đồ dạng chữ</summary>${renderedAiHtml}</details>`
+                : renderedAiHtml;
             responseEl.classList.remove('streaming-response');
-            responseEl.innerHTML = renderedAiHtml;
-            finalHtml += `<div class="markdown-body" style="margin-top: 15px;">${renderedAiHtml}</div>`;
+            responseEl.innerHTML = responseHtml;
+            finalHtml += `<div class="markdown-body" style="margin-top: 15px;">${responseHtml}</div>`;
         } catch (e) {
             streamRenderer.cancel();
             console.error("Lỗi Gemini:", e);
@@ -1549,6 +1552,58 @@ function renderMarkdown(value) {
         : html;
 }
 
+function isMindmapRequest(message) {
+    return /^\s*tạo\s+(?:mindmap|sơ\s+đồ\s+tư\s+duy)/i.test(String(message || ''));
+}
+
+function cleanMindmapLabel(value) {
+    return String(value || '')
+        .replace(/<[^>]*>/g, '')
+        .replace(/^#{1,6}\s+/, '')
+        .replace(/^\*\*(.*?)\*\*$/, '$1')
+        .replace(/[`*_~]/g, '')
+        .replace(/\s+/g, ' ')
+        .trim();
+}
+
+function createMindmapHtml(value, fallbackTitle = 'Sơ đồ tư duy') {
+    const lines = String(value || '').replace(/\r/g, '').split('\n');
+    const heading = lines.find(line => /^#{1,3}\s+/.test(line));
+    const root = cleanMindmapLabel(heading) || cleanMindmapLabel(fallbackTitle) || 'Sơ đồ tư duy';
+    const roots = [];
+    const stack = [];
+
+    for (const line of lines) {
+        const match = line.match(/^(\s*)[-*+]\s+(.+)$/);
+        if (!match) continue;
+        const level = Math.floor(match[1].replace(/\t/g, '  ').length / 2);
+        const label = cleanMindmapLabel(match[2]);
+        if (!label) continue;
+        const node = { label, children: [] };
+        while (stack.length && stack[stack.length - 1].level >= level) stack.pop();
+        if (stack.length) stack[stack.length - 1].node.children.push(node);
+        else roots.push(node);
+        stack.push({ level, node });
+    }
+
+    const branches = (roots.length ? roots : [{ label: 'Nội dung chính', children: [{ label: cleanMindmapLabel(value).slice(0, 180) || 'Chưa nhận được nội dung sơ đồ.' }] }])
+        .slice(0, 7);
+    const renderChildren = (items, depth = 0) => {
+        if (!items?.length || depth > 2) return '';
+        return `<ul>${items.slice(0, 6).map(item => `<li>${escapeHTML(item.label)}${renderChildren(item.children, depth + 1)}</li>`).join('')}</ul>`;
+    };
+
+    return `<section class="mindmap-card" aria-label="Sơ đồ tư duy trực quan">
+        <div class="mindmap-card-header"><span class="mindmap-kicker">DOCBOT AI · MINDMAP</span><span class="mindmap-hint">Vuốt ngang để xem toàn bộ sơ đồ</span></div>
+        <div class="mindmap-scroll" tabindex="0">
+            <div class="mindmap-stage">
+                <div class="mindmap-root"><span>Chủ đề</span><strong>${escapeHTML(root)}</strong></div>
+                <div class="mindmap-branches">${branches.map(branch => `<article class="mindmap-branch"><h4>${escapeHTML(branch.label)}</h4>${renderChildren(branch.children)}</article>`).join('')}</div>
+            </div>
+        </div>
+    </section>`;
+}
+
 // Gá» i API cá»§a Google Gemini
 async function fetchGeminiResponse(message, documentText, files, previousMessages, onUpdate = null) {
     const selectedModel = document.getElementById('modelSelect').value || "gemini-flash-latest";
@@ -1602,7 +1657,7 @@ async function fetchGeminiResponse(message, documentText, files, previousMessage
     } else if (/^\s*tạo\s+flashcard/i.test(message)) {
         currentText += 'Hãy tạo flashcard theo cặp Câu hỏi — Trả lời, ngắn gọn, có thể dùng để ôn tập.\n';
     } else if (/^\s*tạo\s+(?:mindmap|sơ\s+đồ\s+tư\s+duy)/i.test(message)) {
-        currentText += 'Hãy tạo mindmap dạng cây Markdown rõ cấp bậc, bắt đầu từ chủ đề trung tâm rồi đến các nhánh chính và nhánh phụ.\n';
+        currentText += 'Hãy tạo dữ liệu cho sơ đồ tư duy. Bắt đầu bằng tiêu đề Markdown cấp 1 là chủ đề trung tâm. Bên dưới dùng danh sách Markdown thụt đầu dòng 2 khoảng trắng: mỗi mục cấp 0 là một nhánh chính, các mục thụt vào là nhánh phụ. Chỉ dùng tối đa 6 nhánh chính và 5 nhánh phụ mỗi nhánh; mỗi nhãn ngắn gọn dưới 12 từ. Không viết đoạn văn mở đầu hay kết luận.\n';
     }
 
     const hasInlineData = files && files.some(f => f.inlineData);
