@@ -1286,6 +1286,33 @@ async function fetchDocumentSearch(message) {
         return { success: true, question: message, files: [] };
     }
 
+    // Give document tools their source file(s), rather than only a generic AI instruction.
+    // Example comparison request: "So sánh tài liệu: Tài liệu A | Tài liệu B".
+    const compareMatch = message.match(/^\s*(?:so\s*sánh|so\s*sanh)\s+tài\s*liệu\s*:\s*(.+?)\s*(?:\||\s+vs\.?\s+)\s*(.+?)\s*$/i);
+    if (compareMatch) {
+        const [firstResult, secondResult] = await Promise.all([
+            fetchDocumentSearch(`Tìm tài liệu: ${compareMatch[1]}`),
+            fetchDocumentSearch(`Tìm tài liệu: ${compareMatch[2]}`)
+        ]);
+        const pickedFiles = [firstResult, secondResult]
+            .flatMap(result => (result?.files || []).filter(file => file.type === 'file').slice(0, 1))
+            .filter((file, index, list) => list.findIndex(other => other.id === file.id) === index);
+
+        if (pickedFiles.length === 2) {
+            return { success: true, question: message, files: pickedFiles };
+        }
+        return {
+            success: false,
+            error: 'DocBot cần tìm thấy đủ 2 file để so sánh. Hãy kiểm tra lại đúng tên từng tài liệu, ngăn cách bằng dấu |.',
+            isNotFound: true
+        };
+    }
+
+    const actionMatch = message.match(/^\s*(?:tóm\s*tắt|tạo\s+flashcard|tạo\s+(?:mindmap|sơ\s+đồ\s+tư\s+duy))\s*(?:tài\s+liệu\s*:\s*|:\s*)?(.+?)\s*$/i);
+    if (actionMatch) {
+        return fetchDocumentSearch(`Tìm tài liệu: ${actionMatch[1]}`);
+    }
+
     // Nhận diện link Google Drive trực tiếp
     const driveLinkMatch = message.match(/drive\.google\.com\/file\/d\/([a-zA-Z0-9_-]+)/);
     let directFileId = null;
@@ -1567,6 +1594,16 @@ async function fetchGeminiResponse(message, documentText, files, previousMessage
     }
 
     let currentText = `Câu hỏi của người dùng: "${message}"\n`;
+
+    if (/^\s*(?:so\s*sánh|so\s*sanh)\s+tài\s*liệu\s*:/i.test(message)) {
+        currentText += 'Hãy so sánh đúng 2 tài liệu được cung cấp; trả lời bằng bảng Markdown, nêu rõ điểm giống, khác và chỉ kết luận khi nguồn thể hiện rõ.\n';
+    } else if (/^\s*tóm\s*tắt/i.test(message)) {
+        currentText += 'Hãy tóm tắt theo cấu trúc: ý chính, các chi tiết quan trọng và kết luận ngắn.\n';
+    } else if (/^\s*tạo\s+flashcard/i.test(message)) {
+        currentText += 'Hãy tạo flashcard theo cặp Câu hỏi — Trả lời, ngắn gọn, có thể dùng để ôn tập.\n';
+    } else if (/^\s*tạo\s+(?:mindmap|sơ\s+đồ\s+tư\s+duy)/i.test(message)) {
+        currentText += 'Hãy tạo mindmap dạng cây Markdown rõ cấp bậc, bắt đầu từ chủ đề trung tâm rồi đến các nhánh chính và nhánh phụ.\n';
+    }
 
     const hasInlineData = files && files.some(f => f.inlineData);
     if ((documentText && documentText.trim() !== "") || hasInlineData || (files && files.length > 0)) {
@@ -2394,6 +2431,16 @@ document.querySelectorAll('.command-options [data-command]').forEach((button) =>
             messageInput.focus();
         }
         closeCommandPalette();
+    });
+});
+
+document.querySelectorAll('.guide-command-btn[data-guide-command]').forEach((button) => {
+    button.addEventListener('click', () => {
+        if (messageInput) {
+            messageInput.value = button.dataset.guideCommand || '';
+            messageInput.focus();
+        }
+        closeGuide();
     });
 });
 
