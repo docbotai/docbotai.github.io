@@ -2203,7 +2203,20 @@ kbd { border: 1px solid var(--line); background: var(--surface-2); border-radius
 .prompt-footer { color: var(--muted-ink); font-size: 10px; text-align: left; padding-left: 2px; }
 
 .chat-bubble { border-radius: 6px !important; }
-.user-bubble { border: 1px solid var(--line); background: var(--surface) !important; }
+/* Câu hỏi của người dùng chỉ nằm trong một thẻ gọn, không tô nền cả chiều ngang khung chat. */
+.user-bubble { align-items: flex-end; border: 0 !important; background: transparent !important; }
+.user-message-frame { display: flex; flex-direction: column; align-items: flex-end; width: 100%; }
+.user-bubble .bubble-content {
+    width: fit-content;
+    max-width: min(85%, 620px);
+    padding: 14px 18px;
+    border: 1px solid var(--line);
+    border-radius: 10px 10px 4px 10px;
+    background: var(--surface);
+    color: var(--ink);
+    box-shadow: 0 10px 24px rgba(18, 15, 8, .08);
+}
+.user-bubble .user-action-bar { margin-top: 6px !important; }
 .bot-bubble, .ai-bubble { background: transparent !important; }
 .ai-avatar, .chat-avatar { border-radius: 5px !important; background: var(--gold-light) !important; color: var(--gold) !important; }
 
