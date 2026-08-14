@@ -2291,6 +2291,8 @@ body > #settingsDropdown .sub-menu > li { padding: 9px 12px; font-size: 12px; }
 .guide-step h3 { font-size: 14px; letter-spacing: -.01em; margin: 0 0 4px; }
 .guide-step p { color: var(--muted-ink); font-size: 12px; line-height: 1.6; margin: 0; }
 .guide-step strong { color: var(--ink); font-weight: 600; }
+.guide-command-btn { margin-top: 9px; padding: 5px 8px; border: 1px solid var(--gold); border-radius: 4px; color: var(--gold); background: transparent; font: inherit; font-size: 11px; font-weight: 700; cursor: pointer; transition: .18s ease; }
+.guide-command-btn:hover { color: #17130a; background: var(--gold); }
 .guide-command-chip { display: inline-flex; align-items: center; color: var(--gold); border: 1px solid var(--gold); border-radius: 4px; padding: 1px 5px; white-space: nowrap; font-size: 11px; }
 .guide-note { display: flex; gap: 9px; align-items: flex-start; border-top: 1px solid var(--line); padding-top: 16px; color: var(--muted-ink); font-size: 11px; line-height: 1.55; }
 .guide-note span { color: var(--gold); }
