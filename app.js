@@ -1646,7 +1646,8 @@ function createMindmapHtml(value, fallbackTitle = 'Sơ đồ tư duy') {
 
 // Gá» i API cá»§a Google Gemini
 async function fetchGeminiResponse(message, documentText, files, previousMessages, onUpdate = null) {
-    const selectedModel = document.getElementById('modelSelect').value || "gemini-flash-latest";
+    const selectedModel = document.getElementById('modelSelect').value || "gemini-3.5-flash-lite";
+    const isMindmapTask = isMindmapRequest(message);
 
     const systemPrompt = `Bạn là DocBot, một trợ lý AI chuyên hỗ trợ học tập và tìm kiếm tài liệu.\nNguyên tắc trả lời:\n1. Nếu người dùng chỉ nhập 1-2 từ (ví dụ: "Toán", "Vật lý") mà chưa rõ ý định, hãy trả lời thân thiện.\n2. NẾU BẠN VỪA TÌM THẤY TÀI LIỆU: TỰ ĐỘNG đọc nội dung tài liệu đính kèm và TÓM TẮT BỐ CỤC (Ví dụ: Tài liệu gồm 3 phần. Phần 1: nội dung... Phần 2: nội dung...). Đặc biệt với các đề thi (Văn, Toán...), hãy chỉ rõ từng phần (Đọc hiểu, Nghị luận xã hội, Nghị luận văn học...) và giải thích tóm tắt nội dung/chủ đề của phần đó.\n3. Nếu hỏi bài tập, hãy ĐỌC kĩ tài liệu đính kèm để giải đáp chi tiết.\n4. TUYỆT ĐỐI KHÔNG bọc toàn bộ lời giải trong code block (không dùng \`\`\` hay \`\`\`markdown). Văn bản và công thức toán học ($ hoặc $$) phải để ở dạng text thường để hệ thống render.\n5. Định dạng công thức: công thức ngắn dùng $...$ và có khoảng trắng trước/sau; công thức dài, có phân số, căn, mũ/chỉ số hoặc nhiều phép toán phải đặt trên một dòng riêng bằng $$...$$. Không chèn công thức dài giữa câu chữ.`;
 
@@ -1657,14 +1658,16 @@ async function fetchGeminiResponse(message, documentText, files, previousMessage
         contents: [],
         generationConfig: {
             temperature: 0.35,
-            maxOutputTokens: 2048,
+            // Mindmap only needs a short outline; a concise reply starts sooner
+            // and avoids exhausting the Worker request window on PDF documents.
+            maxOutputTokens: isMindmapTask ? 900 : 2048,
         }
     };
 
     // Đưa lịch sử chat vào contents (để lấy ngữ cảnh)
     if (previousMessages && previousMessages.length > 0) {
         // Chỉ lấy tối đa 10 tin nhắn gần nhất để tránh quá tải token
-        const recentMessages = previousMessages.slice(-10);
+        const recentMessages = previousMessages.slice(isMindmapTask ? -2 : -10);
         for (const msg of recentMessages) {
             let rawContent = msg.content;
             if (msg.role === 'ai') {
